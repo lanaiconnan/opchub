@@ -1,0 +1,28 @@
+const express = require('express');
+const app = express();
+const PORT = 3000;
+
+app.use(express.json());
+
+// 模拟OPC数据（初始为空）
+let opcList = [];
+
+// 获取OPC列表
+app.get('/opc/list', (req, res) => {
+res.json(opcList);
+});
+
+// 发布OPC服务
+app.post('/opc/publish', (req, res) => {
+const { name, skills, contact } = req.body;
+if (!name || !skills || !contact) {
+return res.status(400).json({ error: '缺少必填字段' });
+}
+const newOpc = { id: Date.now(), name, skills, contact };
+opcList.push(newOpc);
+res.json({ success: true, opc: newOpc });
+});
+
+app.listen(PORT, () => {
+console.log(`OPC后端服务运行在 http://localhost:${PORT}`);
+});
