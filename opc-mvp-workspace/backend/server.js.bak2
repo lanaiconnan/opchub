@@ -4,7 +4,6 @@ const { Low } = require('lowdb');
 const { JSONFile } = require('lowdb/node');
 const path = require('path');
 const http = require('http');
-const crypto = require('crypto');
 
 const app = express();
 app.use(cors());
@@ -13,7 +12,7 @@ app.use(express.json());
 const PORT = 3000;
 const dbPath = path.join(__dirname, 'db.json');
 const adapter = new JSONFile(dbPath);
-const db = new Low(adapter, { opcList: [], applications: [], stars: [] });
+const db = new Low(adapter, { opcList: [] });
 
 const OLLAMA_URL = 'http://localhost:11434';
 const OLLAMA_MODEL = 'qwen2.5:0.5b';
@@ -40,19 +39,6 @@ function ollamaChat(messages) {
     req.end();
   });
 }
-
-// Helper: get user ID (IP + User-Agent hash)
-function getUserId(req) {
-  try {
-    const ip = req.ip || req.connection?.remoteAddress || 'unknown';
-    const ua = req.get('User-Agent') || '';
-    return crypto.createHash('md5').update(ip + ua).digest('hex').slice(0, 16);
-  } catch (e) {
-    return 'anonymous-' + Date.now();
-  }
-}
-
-// ==================== OPC CRUD ====================
 
 // GET /opc/list
 app.get('/opc/list', async (req, res) => {
@@ -126,14 +112,19 @@ app.get('/opc/match/:id', async (req, res) => {
     .filter(opc => opc.id !== target.id)
     .map(opc => {
       let score = 0;
+      // 分类匹配
       if (opc.category === target.category && opc.category !== 'other') score += 3;
+      // 协作类型匹配
       if (opc.collaborationType === target.collaborationType) score += 2;
+      // 技能重叠
       const shared = (target.requiredSkills || []).filter(s => (opc.requiredSkills || []).includes(s));
       score += shared.length * 1.5;
+      // 标签重叠
       const targetTags = (target.tags || '').split(/[,，、]/).map(t => t.trim()).filter(Boolean);
       const opcTags = (opc.tags || '').split(/[,，、]/).map(t => t.trim()).filter(Boolean);
       const sharedTags = targetTags.filter(t => opcTags.includes(t));
       score += sharedTags.length;
+      // 描述关键词重叠
       const kw1 = (target.description || '').toLowerCase();
       const kw2 = (opc.description || '').toLowerCase();
       if (kw1 && kw2) {
@@ -155,6 +146,7 @@ app.post('/opc/chat', async (req, res) => {
     const { opcId, messages } = req.body;
     if (!messages || !messages.length) return res.status(400).json({ error: 'messages required' });
 
+    // Build system prompt from OPC data
     await db.read();
     const opc = db.data.opcList.find(i => i.id === Number(opcId));
     const sysPrompt = opc
@@ -162,6 +154,7 @@ app.post('/opc/chat', async (req, res) => {
       : 'You are a helpful collaboration assistant.';
 
     const chatMessages = [{ role: 'system', content: sysPrompt }, ...messages];
+
     const result = await ollamaChat(chatMessages);
     res.json({ reply: result.message?.content || 'No response from AI.' });
   } catch (err) {
@@ -169,127 +162,6 @@ app.post('/opc/chat', async (req, res) => {
     res.json({ reply: 'AI service is temporarily unavailable. Please make sure Ollama is running and ' + OLLAMA_MODEL + ' model is available.' });
   }
 });
-
-// ==================== 申请流程 ====================
-
-// POST /opc/apply — 提交申请
-app.post('/opc/apply', async (req, res) => {
-  try {
-    await db.read();
-    db.data.applications = db.data.applications || [];
-    const { opcId, applicantName, applicantContact, message } = req.body;
-    if (!opcId || !applicantName || !applicantContact) {
-      return res.status(400).json({ error: 'opcId, applicantName, applicantContact are required' });
-    }
-    
-    const opc = db.data.opcList.find(i => i.id === Number(opcId));
-    if (!opc) return res.status(404).json({ error: 'OPC not found' });
-    
-    const application = {
-      id: Date.now(),
-      opcId: Number(opcId),
-      applicantName,
-      applicantContact,
-      message: message || '',
-      status: 'pending',
-      createdAt: new Date().toISOString()
-    };
-    
-    db.data.applications.push(application);
-    await db.write();
-    res.json({ success: true, application });
-  } catch (err) {
-    console.error('Apply error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /opc/applicants/:id — 查看某 OPC 的所有申请
-app.get('/opc/applicants/:id', async (req, res) => {
-  await db.read();
-  const opcId = Number(req.params.id);
-  const applications = (db.data.applications || []).filter(a => a.opcId === opcId);
-  res.json(applications);
-});
-
-// PUT /opc/application/:id — 更新申请状态（同意/拒绝）
-app.put('/opc/application/:id', async (req, res) => {
-  await db.read();
-  db.data.applications = db.data.applications || [];
-  const appId = Number(req.params.id);
-  const { status } = req.body;
-  
-  if (!['accepted', 'rejected'].includes(status)) {
-    return res.status(400).json({ error: 'status must be accepted or rejected' });
-  }
-  
-  const app = db.data.applications.find(a => a.id === appId);
-  if (!app) return res.status(404).json({ error: 'Application not found' });
-  
-  app.status = status;
-  app.updatedAt = new Date().toISOString();
-  await db.write();
-  res.json({ success: true, application: app });
-});
-
-// ==================== Star 系统 ====================
-
-// POST /opc/star/:id — star/unstar (toggle)
-app.post('/opc/star/:id', async (req, res) => {
-  try {
-    await db.read();
-    db.data.stars = db.data.stars || [];
-    const opcId = Number(req.params.id);
-    const userId = getUserId(req);
-    
-    // 检查 OPC 是否存在
-    const opc = db.data.opcList.find(i => i.id === opcId);
-    if (!opc) return res.status(404).json({ error: 'OPC not found' });
-    
-    let starRecord = db.data.stars.find(s => s.opcId === opcId);
-    
-    if (!starRecord) {
-      // 首次 star
-      starRecord = { opcId, count: 1, starredBy: [userId] };
-      db.data.stars.push(starRecord);
-      await db.write();
-      return res.json({ success: true, starred: true, count: 1 });
-    }
-    
-    const idx = starRecord.starredBy.indexOf(userId);
-    if (idx === -1) {
-      // star
-      starRecord.starredBy.push(userId);
-      starRecord.count++;
-    } else {
-      // unstar
-      starRecord.starredBy.splice(idx, 1);
-      starRecord.count = Math.max(0, starRecord.count - 1);
-    }
-    
-    await db.write();
-    res.json({ success: true, starred: idx === -1, count: starRecord.count });
-  } catch (err) {
-    console.error('Star error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// GET /opc/star/:id — 获取 star 数和当前用户是否已 star
-app.get('/opc/star/:id', async (req, res) => {
-  await db.read();
-  db.data.stars = db.data.stars || [];
-  const opcId = Number(req.params.id);
-  const userId = getUserId(req);
-  
-  const starRecord = db.data.stars.find(s => s.opcId === opcId);
-  const count = starRecord ? starRecord.count : 0;
-  const starred = starRecord ? starRecord.starredBy.includes(userId) : false;
-  
-  res.json({ count, starred });
-});
-
-// ==================== Start Server ====================
 
 app.listen(PORT, () => {
   console.log('OPC server running on http://localhost:' + PORT);

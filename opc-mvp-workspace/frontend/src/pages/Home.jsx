@@ -6,14 +6,67 @@ import axios from 'axios';
 function Home() {
   const navigate = useNavigate();
   const [opcList, setOpcList] = useState([]);
+  const [starData, setStarData] = useState({}); // { [opcId]: { count, starred } }
   const [loading, setLoading] = useState(true);
-  const [selectedOpc, setSelectedOpc] = useState(null); // 当前选中的OPC
-  const [recommendations, setRecommendations] = useState([]); // 推荐列表
-  const [loadingRec, setLoadingRec] = useState(false); // 推荐加载状态
+  const [selectedOpc, setSelectedOpc] = useState(null);
+  const [recommendations, setRecommendations] = useState([]);
+  const [loadingRec, setLoadingRec] = useState(false);
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [applyForm, setApplyForm] = useState({ applicantName: '', applicantContact: '', message: '' });
+  const [applyLoading, setApplyLoading] = useState(false);
   const opcListRef = useRef(null);
 
   const handleSend = (message) => {
     alert(`你输入了: ${message}\n（AI Agent 对话功能开发中...）`);
+  };
+
+  // 获取所有 OPC 的 star 信息
+  const fetchStarData = async (opcIds) => {
+    const data = {};
+    for (const id of opcIds) {
+      try {
+        const res = await axios.get(`/opc/star/${id}`);
+        data[id] = res.data;
+      } catch (err) {
+        data[id] = { count: 0, starred: false };
+      }
+    }
+    setStarData(data);
+  };
+
+  // 切换 star
+  const toggleStar = async (opcId, e) => {
+    e.stopPropagation();
+    try {
+      const res = await axios.post(`/opc/star/${opcId}`);
+      setStarData(prev => ({
+        ...prev,
+        [opcId]: { count: res.data.count, starred: res.data.starred }
+      }));
+    } catch (err) {
+      console.error('Star 失败:', err);
+    }
+  };
+
+  // 提交申请
+  const submitApplication = async () => {
+    if (!applyForm.applicantName || !applyForm.applicantContact) {
+      alert('请填写姓名和联系方式');
+      return;
+    }
+    setApplyLoading(true);
+    try {
+      await axios.post('/opc/apply', {
+        opcId: selectedOpc.id,
+        ...applyForm
+      });
+      alert('申请已提交！');
+      setShowApplyModal(false);
+      setApplyForm({ applicantName: '', applicantContact: '', message: '' });
+    } catch (err) {
+      alert('申请失败: ' + (err.response?.data?.error || err.message));
+    }
+    setApplyLoading(false);
   };
 
   // 获取相似推荐
@@ -34,6 +87,8 @@ function Home() {
       .then(res => {
         setOpcList(res.data);
         setLoading(false);
+        // 批量获取 star 数据
+        fetchStarData(res.data.map(opc => opc.id));
       })
       .catch(() => setLoading(false));
   }, []);
@@ -51,7 +106,6 @@ function Home() {
               if (opcListRef.current) {
                 opcListRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
               } else {
-                console.error('opcListRef 未绑定到DOM元素');
                 alert('页面加载中，请稍后再试');
               }
             }} 
@@ -82,6 +136,14 @@ function Home() {
             <div style={styles.cardLeft}>
               <h3 style={styles.cardTitle}>
                 🔥 {opc.name}
+                {starData[opc.id] && (
+                  <span 
+                    style={styles.starBadge}
+                    onClick={(e) => toggleStar(opc.id, e)}
+                  >
+                    {starData[opc.id].starred ? '⭐' : '☆'} {starData[opc.id].count}
+                  </span>
+                )}
               </h3>
               {(opc.category && opc.category !== 'other') && (
                 <span style={styles.metaBadge}>{opc.category}</span>
@@ -106,16 +168,20 @@ function Home() {
                   <span style={styles.metaBadge}>{opc.timeCommitment}</span>
                 )}
               </div>
+              <div style={styles.metaRow}>
+                <span style={styles.contact}>📧 {opc.contact}</span>
+              </div>
             </div>
             <div style={styles.cardRight}>
               <button 
                 onClick={(e) => {
                   e.stopPropagation();
-                  navigate(`/publish?id=${opc.id}`);
+                  setSelectedOpc(opc);
+                  setShowApplyModal(true);
                 }}
-                style={styles.btnSmall}
+                style={styles.btnApply}
               >
-                查看详情
+                申请加入
               </button>
               <button 
                 onClick={(e) => {
@@ -130,8 +196,8 @@ function Home() {
           </div>
         ))}
       
-      {/* 相似推荐区块 - 放在列表区内部 */}
-      {selectedOpc && (
+      {/* 相似推荐区块 */}
+      {selectedOpc && !showApplyModal && (
         <div style={styles.recommendSection}>
           <h2 style={styles.sectionTitle}>
             🤖 与「{selectedOpc.name}」相似的OPC
@@ -163,6 +229,48 @@ function Home() {
         </div>
       )}
       </div>
+
+      {/* 申请弹窗 */}
+      {showApplyModal && selectedOpc && (
+        <div style={styles.modalOverlay} onClick={() => setShowApplyModal(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <h2 style={styles.modalTitle}>申请加入「{selectedOpc.name}」</h2>
+            <div style={styles.modalField}>
+              <label>你的姓名 *</label>
+              <input 
+                style={styles.input}
+                value={applyForm.applicantName}
+                onChange={e => setApplyForm({ ...applyForm, applicantName: e.target.value })}
+                placeholder="请输入姓名"
+              />
+            </div>
+            <div style={styles.modalField}>
+              <label>联系方式 *</label>
+              <input 
+                style={styles.input}
+                value={applyForm.applicantContact}
+                onChange={e => setApplyForm({ ...applyForm, applicantContact: e.target.value })}
+                placeholder="邮箱或手机号"
+              />
+            </div>
+            <div style={styles.modalField}>
+              <label>留言（可选）</label>
+              <textarea 
+                style={{ ...styles.input, minHeight: '80px' }}
+                value={applyForm.message}
+                onChange={e => setApplyForm({ ...applyForm, message: e.target.value })}
+                placeholder="简单介绍一下你自己..."
+              />
+            </div>
+            <div style={styles.modalActions}>
+              <button onClick={() => setShowApplyModal(false)} style={styles.btnCancel}>取消</button>
+              <button onClick={submitApplication} style={styles.btnSubmit} disabled={applyLoading}>
+                {applyLoading ? '提交中...' : '提交申请'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -256,6 +364,19 @@ const styles = {
     fontWeight: '600',
     color: '#1F2328',
     marginBottom: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  starBadge: {
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#656d76',
+    cursor: 'pointer',
+    padding: '2px 8px',
+    borderRadius: '12px',
+    backgroundColor: '#f6f8fa',
+    border: '1px solid #d0d7de',
   },
   cardDesc: {
     color: '#656d76',
@@ -285,11 +406,15 @@ const styles = {
     fontSize: '11px',
     fontWeight: '500',
   },
+  contact: {
+    fontSize: '12px',
+    color: '#656d76',
+  },
   cardRight: {
     minWidth: '100px',
     textAlign: 'right',
   },
-  btnSmall: {
+  btnApply: {
     backgroundColor: '#2ea44f',
     color: '#ffffff',
     padding: '6px 16px',
@@ -299,6 +424,8 @@ const styles = {
     border: 'none',
     cursor: 'pointer',
     marginRight: '8px',
+    marginBottom: '6px',
+    display: 'block',
   },
   btnAI: {
     backgroundColor: 'transparent',
@@ -309,6 +436,7 @@ const styles = {
     fontWeight: '600',
     border: '1px solid #2ea44f',
     cursor: 'pointer',
+    display: 'block',
   },
   // 推荐区块样式
   recommendSection: {
@@ -342,5 +470,81 @@ const styles = {
     borderRadius: '12px',
     fontSize: '11px',
     fontWeight: '600',
+  },
+  btnSmall: {
+    backgroundColor: '#2ea44f',
+    color: '#ffffff',
+    padding: '6px 16px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: '600',
+    border: 'none',
+    cursor: 'pointer',
+  },
+  // 弹窗样式
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1000,
+  },
+  modal: {
+    backgroundColor: '#ffffff',
+    borderRadius: '12px',
+    padding: '24px',
+    width: '90%',
+    maxWidth: '480px',
+    maxHeight: '90vh',
+    overflowY: 'auto',
+  },
+  modalTitle: {
+    fontSize: '20px',
+    fontWeight: '600',
+    marginBottom: '20px',
+    color: '#1F2328',
+  },
+  modalField: {
+    marginBottom: '16px',
+  },
+  input: {
+    width: '100%',
+    padding: '10px 12px',
+    fontSize: '14px',
+    border: '1px solid #d0d7de',
+    borderRadius: '6px',
+    marginTop: '6px',
+    boxSizing: 'border-box',
+  },
+  modalActions: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '12px',
+    marginTop: '24px',
+  },
+  btnCancel: {
+    backgroundColor: '#f6f8fa',
+    color: '#1F2328',
+    padding: '10px 20px',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '600',
+    border: '1px solid #d0d7de',
+    cursor: 'pointer',
+  },
+  btnSubmit: {
+    backgroundColor: '#2ea44f',
+    color: '#ffffff',
+    padding: '10px 20px',
+    borderRadius: '6px',
+    fontSize: '14px',
+    fontWeight: '600',
+    border: 'none',
+    cursor: 'pointer',
   },
 };
