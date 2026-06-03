@@ -43,7 +43,8 @@ function Register() {
         // 注册成功后自动登录
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        navigate('/');
+        // 强制刷新页面，确保 Navbar 重新渲染
+        window.location.href = '/';
       } else {
         setError(data.error || '注册失败');
       }

@@ -5,17 +5,22 @@ export default function Navbar() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
   
-  useEffect(() => {
-    // 从 localStorage 读取用户信息
+  // 读取 localStorage
+  const readUser = () => {
     const userStr = localStorage.getItem('user');
     if (userStr) {
       try {
-        setUser(JSON.parse(userStr));
+        return JSON.parse(userStr);
       } catch (e) {
-        setUser(null);
+        return null;
       }
     }
-  }, []);
+    return null;
+  };
+  
+  useEffect(() => {
+    setUser(readUser());
+  }, [navigate]); // navigate 变化时重新读取
   
   const handleLogout = () => {
     localStorage.removeItem('token');

@@ -31,7 +31,8 @@ function Login() {
         // 保存 token 到 localStorage
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        navigate('/');
+        // 强制刷新页面，确保 Navbar 重新渲染
+        window.location.href = '/';
       } else {
         setError(data.error || '登录失败');
       }
