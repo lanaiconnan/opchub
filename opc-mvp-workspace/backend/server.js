@@ -102,6 +102,44 @@ app.delete('/opc/delete/:id', async (req, res) => {
   res.json({ success: true });
 });
 
+// GET /opc/match/:id — 相似推荐
+app.get('/opc/match/:id', async (req, res) => {
+  await db.read();
+  const target = db.data.opcList.find(i => i.id === Number(req.params.id));
+  if (!target) return res.status(404).json({ error: 'OPC not found' });
+
+  const scored = db.data.opcList
+    .filter(opc => opc.id !== target.id)
+    .map(opc => {
+      let score = 0;
+      // 分类匹配
+      if (opc.category === target.category && opc.category !== 'other') score += 3;
+      // 协作类型匹配
+      if (opc.collaborationType === target.collaborationType) score += 2;
+      // 技能重叠
+      const shared = (target.requiredSkills || []).filter(s => (opc.requiredSkills || []).includes(s));
+      score += shared.length * 1.5;
+      // 标签重叠
+      const targetTags = (target.tags || '').split(/[,，、]/).map(t => t.trim()).filter(Boolean);
+      const opcTags = (opc.tags || '').split(/[,，、]/).map(t => t.trim()).filter(Boolean);
+      const sharedTags = targetTags.filter(t => opcTags.includes(t));
+      score += sharedTags.length;
+      // 描述关键词重叠
+      const kw1 = (target.description || '').toLowerCase();
+      const kw2 = (opc.description || '').toLowerCase();
+      if (kw1 && kw2) {
+        const words = kw1.split(/[\s，。、！？]+/).filter(w => w.length > 2);
+        score += words.filter(w => kw2.includes(w)).length * 0.5;
+      }
+      return { ...opc, similarity: Math.min(score / 10, 0.99) };
+    })
+    .filter(opc => opc.similarity > 0.05)
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, 5);
+
+  res.json(scored);
+});
+
 // POST /opc/chat — Ollama LLM
 app.post('/opc/chat', async (req, res) => {
   try {
