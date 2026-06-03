@@ -58,9 +58,13 @@ function MyApplications() {
 
   const handleUpdateStatus = async (appId, status) => {
     try {
+      const token = localStorage.getItem('token');
       const res = await fetch(`${API}/application/${appId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ status })
       });
       const data = await res.json();
