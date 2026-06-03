@@ -5,6 +5,8 @@ import Publish from './pages/Publish';
 import MyCollaborations from './pages/MyCollaborations';
 import ChatPage from './pages/ChatPage';
 import MyApplications from './pages/MyApplications';
+import Login from './pages/Login';
+import Register from './pages/Register';
 
 function App() {
   return (
@@ -16,6 +18,8 @@ function App() {
         <Route path="/my-collaborations" element={<MyCollaborations />} />
         <Route path="/my-applications" element={<MyApplications />} />
         <Route path="/chat/:id" element={<ChatPage />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
       </Routes>
     </Router>
   );

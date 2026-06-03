@@ -17,17 +17,20 @@ function MyApplications() {
   const fetchApplications = async () => {
     setLoading(true);
     setError('');
-    try {
-      const contact = localStorage.getItem('userContact') || '';
-      if (!contact) {
-        setError('请先在「发布OPC」页面填写联系方式，系统才能识别您的身份');
-        setLoading(false);
-        return;
-      }
+    
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('请先登录');
+      setLoading(false);
+      return;
+    }
 
+    try {
       if (activeTab === 'received') {
         // 获取我创建的 OPC 收到的申请
-        const res = await fetch(`${API}/my-applications/received?contact=${encodeURIComponent(contact)}`);
+        const res = await fetch(`${API}/my-applications/received`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
         const data = await res.json();
         if (data.success) {
           setApplications(data.applications);
@@ -36,7 +39,9 @@ function MyApplications() {
         }
       } else {
         // 获取我发起的申请
-        const res = await fetch(`${API}/my-applications/sent?contact=${encodeURIComponent(contact)}`);
+        const res = await fetch(`${API}/my-applications/sent`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
         const data = await res.json();
         if (data.success) {
           setApplications(data.applications);

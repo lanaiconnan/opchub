@@ -1,6 +1,29 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 
 export default function Navbar() {
+  const navigate = useNavigate();
+  const [user, setUser] = useState(null);
+  
+  useEffect(() => {
+    // 从 localStorage 读取用户信息
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        setUser(JSON.parse(userStr));
+      } catch (e) {
+        setUser(null);
+      }
+    }
+  }, []);
+  
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setUser(null);
+    navigate('/');
+  };
+  
   return (
     <nav style={styles.nav}>
       <div style={styles.left}>
@@ -9,6 +32,14 @@ export default function Navbar() {
       <div style={styles.right}>
         <Link to="/my-applications" style={styles.link}>我的申请</Link>
         <Link to="/publish" style={styles.btnGreen}>New OPC</Link>
+        {user ? (
+          <div style={styles.userSection}>
+            <span style={styles.username}>{user.username}</span>
+            <button onClick={handleLogout} style={styles.logoutBtn}>登出</button>
+          </div>
+        ) : (
+          <Link to="/login" style={styles.loginBtn}>登录</Link>
+        )}
       </div>
     </nav>
   );
@@ -62,5 +93,34 @@ const styles = {
     border: '1px solid rgba(27,31,36,0.15)',
     boxShadow: '0 1px 0 rgba(27,31,36,0.1)',
     transition: 'background-color 0.2s',
+  },
+  loginBtn: {
+    color: '#ffffff',
+    fontSize: '14px',
+    fontWeight: '500',
+    textDecoration: 'none',
+    padding: '5px 12px',
+    borderRadius: '6px',
+    border: '1px solid rgba(255,255,255,0.3)',
+    transition: 'background-color 0.2s',
+  },
+  userSection: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
+  username: {
+    color: '#ffffff',
+    fontSize: '14px',
+    fontWeight: '500',
+  },
+  logoutBtn: {
+    padding: '4px 12px',
+    fontSize: '13px',
+    color: '#fff',
+    backgroundColor: 'transparent',
+    border: '1px solid rgba(255,255,255,0.3)',
+    borderRadius: '6px',
+    cursor: 'pointer',
   },
 };

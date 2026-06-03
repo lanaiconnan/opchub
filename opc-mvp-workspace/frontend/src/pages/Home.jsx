@@ -56,9 +56,12 @@ function Home() {
     }
     setApplyLoading(true);
     try {
+      const token = localStorage.getItem('token');
       await axios.post('/opc/apply', {
         opcId: selectedOpc.id,
         ...applyForm
+      }, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       });
       alert('申请已提交！');
       setShowApplyModal(false);

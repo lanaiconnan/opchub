@@ -1,0 +1,84 @@
+{
+  "opcList": [
+    {
+      "id": 1780330439307,
+      "name": "测试opc",
+      "description": "",
+      "tags": "",
+      "price": "",
+      "contact": "188",
+      "category": "other",
+      "requiredSkills": [],
+      "collaborationType": "once",
+      "experienceLevel": "any",
+      "timeCommitment": ""
+    },
+    {
+      "id": 1780330459101,
+      "name": "fde",
+      "description": "",
+      "tags": "",
+      "price": "",
+      "contact": "199",
+      "category": "other",
+      "requiredSkills": [],
+      "collaborationType": "once",
+      "experienceLevel": "any",
+      "timeCommitment": ""
+    },
+    {
+      "id": 1780416019979,
+      "name": "API测试",
+      "description": "测试publish接口",
+      "tags": "test",
+      "price": "免费",
+      "contact": "test@test.com",
+      "category": "other",
+      "requiredSkills": [],
+      "collaborationType": "once",
+      "experienceLevel": "any",
+      "timeCommitment": ""
+    },
+    {
+      "id": 1780455345818,
+      "name": "修复测试",
+      "description": "验证LowDB写入",
+      "tags": "",
+      "price": "",
+      "contact": "test@test.com",
+      "category": "tech",
+      "requiredSkills": [],
+      "collaborationType": "longterm",
+      "experienceLevel": "any",
+      "timeCommitment": ""
+    }
+  ],
+  "stars": [
+    {
+      "opcId": 1780330439307,
+      "count": 2,
+      "starredBy": [
+        "da6b594443f830fe",
+        "be7b9c93380e70f5"
+      ]
+    },
+    {
+      "opcId": 1780330459101,
+      "count": 1,
+      "starredBy": [
+        "be7b9c93380e70f5"
+      ]
+    }
+  ],
+  "applications": [
+    {
+      "id": 1780487123539,
+      "opcId": 1780330439307,
+      "applicantName": "测试用户",
+      "applicantContact": "test@example.com",
+      "message": "我想加入",
+      "status": "pending",
+      "createdAt": "2026-06-03T11:45:23.539Z"
+    }
+  ]
+}
