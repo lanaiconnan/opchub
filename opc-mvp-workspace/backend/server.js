@@ -289,6 +289,62 @@ app.get('/opc/star/:id', async (req, res) => {
   res.json({ count, starred });
 });
 
+// ==================== My Applications ====================
+
+// GET /opc/my-applications/received?contact=xxx — 获取我收到的申请（我创建的OPC的申请）
+app.get('/opc/my-applications/received', async (req, res) => {
+  try {
+    await db.read();
+    db.data.applications = db.data.applications || [];
+    db.data.opcList = db.data.opcList || [];
+    
+    const contact = req.query.contact;
+    if (!contact) return res.status(400).json({ error: 'Missing contact parameter' });
+    
+    // 找到我创建的 OPC
+    const myOpcs = db.data.opcList.filter(opc => opc.contact === contact);
+    const myOpcIds = myOpcs.map(opc => opc.id);
+    
+    // 找到这些 OPC 的申请
+    const applications = db.data.applications
+      .filter(app => myOpcIds.includes(app.opcId))
+      .map(app => {
+        const opc = db.data.opcList.find(o => o.id === app.opcId);
+        return { ...app, opcName: opc ? opc.name : `OPC #${app.opcId}` };
+      });
+    
+    res.json({ success: true, applications });
+  } catch (err) {
+    console.error('Get received applications error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /opc/my-applications/sent?contact=xxx — 获取我发起的申请
+app.get('/opc/my-applications/sent', async (req, res) => {
+  try {
+    await db.read();
+    db.data.applications = db.data.applications || [];
+    db.data.opcList = db.data.opcList || [];
+    
+    const contact = req.query.contact;
+    if (!contact) return res.status(400).json({ error: 'Missing contact parameter' });
+    
+    // 找到我发起的申请
+    const applications = db.data.applications
+      .filter(app => app.applicantContact === contact)
+      .map(app => {
+        const opc = db.data.opcList.find(o => o.id === app.opcId);
+        return { ...app, opcName: opc ? opc.name : `OPC #${app.opcId}` };
+      });
+    
+    res.json({ success: true, applications });
+  } catch (err) {
+    console.error('Get sent applications error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ==================== Start Server ====================
 
 app.listen(PORT, () => {

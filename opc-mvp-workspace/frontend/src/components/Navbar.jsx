@@ -7,6 +7,7 @@ export default function Navbar() {
         <Link to="/" style={styles.logo}>🤝 OPC协作网络</Link>
       </div>
       <div style={styles.right}>
+        <Link to="/my-applications" style={styles.link}>我的申请</Link>
         <Link to="/publish" style={styles.btnGreen}>New OPC</Link>
       </div>
     </nav>
@@ -40,6 +41,15 @@ const styles = {
     display: 'flex',
     alignItems: 'center',
     gap: '12px',
+  },
+  link: {
+    color: '#ffffff',
+    fontSize: '14px',
+    fontWeight: '500',
+    textDecoration: 'none',
+    padding: '5px 12px',
+    borderRadius: '6px',
+    transition: 'background-color 0.2s',
   },
   btnGreen: {
     backgroundColor: '#2ea44f',

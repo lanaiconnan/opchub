@@ -53,7 +53,12 @@ function Publish() {
       experienceLevel,
       timeCommitment,
     };
-    const after = () => { alert(editId ? '编辑成功！' : '发布成功！'); navigate('/'); };
+    const after = () => { 
+      // 保存 contact 到 localStorage，用于识别「我的申请」
+      localStorage.setItem('userContact', contact);
+      alert(editId ? '编辑成功！' : '发布成功！'); 
+      navigate('/'); 
+    };
     const fail = err => alert((editId ? '编辑' : '发布') + '失败：' + err.message);
     (editId
       ? axios.put(`http://localhost:3000/opc/edit/${editId}`, data)
