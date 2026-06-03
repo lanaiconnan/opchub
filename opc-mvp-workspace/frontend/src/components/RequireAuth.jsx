@@ -10,27 +10,38 @@ function RequireAuth({ children }) {
 
   useEffect(() => {
     const token = localStorage.getItem('token');
-    if (token) {
-      // 验证 token 是否有效
-      fetch('/opc/auth/me', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-        .then(res => {
-          if (res.ok) {
-            setIsAuthenticated(true);
-          } else {
-            // token 无效，清除
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            setIsAuthenticated(false);
-          }
-        })
-        .catch(() => {
-          setIsAuthenticated(false);
-        });
-    } else {
+    if (!token) {
       setIsAuthenticated(false);
+      return;
     }
+    
+    // 带超时的验证
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    
+    fetch('/opc/auth/me', {
+      headers: { 'Authorization': `Bearer ${token}` },
+      signal: controller.signal
+    })
+      .then(res => {
+        clearTimeout(timeout);
+        if (res.ok) {
+          setIsAuthenticated(true);
+        } else {
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          setIsAuthenticated(false);
+        }
+      })
+      .catch(() => {
+        clearTimeout(timeout);
+        // 网络错误时也允许访问，避免一直卡在验证中
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        setIsAuthenticated(false);
+      });
+    
+    return () => clearTimeout(timeout);
   }, []);
 
   if (isAuthenticated === null) {

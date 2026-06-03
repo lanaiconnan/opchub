@@ -17,6 +17,7 @@ function MyApplications() {
   const fetchApplications = async () => {
     setLoading(true);
     setError('');
+    setApplications([]);
     
     const token = localStorage.getItem('token');
     if (!token) {
@@ -112,10 +113,24 @@ function MyApplications() {
         </button>
       </div>
 
-      {error && <div style={{ color: 'red', marginBottom: 10 }}>{error}</div>}
+      {error ? (
+        <div style={{ 
+          color: '#dc3545', 
+          padding: '12px 16px', 
+          backgroundColor: '#f8d7da', 
+          border: '1px solid #f5c6cb',
+          borderRadius: 6,
+          marginBottom: 16
+        }}>
+          ⚠️ {error}
+        </div>
+      ) : null}
 
       {loading ? (
-        <div>加载中...</div>
+        <div style={{ textAlign: 'center', padding: 40, color: '#666' }}>
+          <div style={{ fontSize: 24, marginBottom: 8 }}>⏳</div>
+          加载中...
+        </div>
       ) : (
         <div>
           {applications.length === 0 ? (
