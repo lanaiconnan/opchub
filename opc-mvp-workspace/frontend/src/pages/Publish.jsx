@@ -62,8 +62,8 @@ function Publish() {
     };
     const fail = err => alert((editId ? '编辑' : '发布') + '失败：' + err.message);
     (editId
-      ? axios.put(`http://localhost:3000/opc/edit/${editId}`, data, { headers })
-      : axios.post('http://localhost:3000/opc/publish', data, { headers })
+      ? axios.put(`/opc/edit/${editId}`, data, { headers })
+      : axios.post('/opc/publish', data, { headers })
     ).then(after).catch(fail);
   };
 

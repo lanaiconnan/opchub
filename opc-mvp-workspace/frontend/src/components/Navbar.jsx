@@ -30,8 +30,12 @@ export default function Navbar() {
         <Link to="/" style={styles.logo}>🤝 OPC协作网络</Link>
       </div>
       <div style={styles.right}>
-        <Link to="/my-applications" style={styles.link}>我的申请</Link>
-        <Link to="/publish" style={styles.btnGreen}>New OPC</Link>
+        {user && (
+          <>
+            <Link to="/my-applications" style={styles.link}>我的申请</Link>
+            <Link to="/publish" style={styles.btnGreen}>New OPC</Link>
+          </>
+        )}
         {user ? (
           <div style={styles.userSection}>
             <span style={styles.username}>{user.username}</span>
