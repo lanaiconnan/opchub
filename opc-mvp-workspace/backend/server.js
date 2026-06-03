@@ -5,6 +5,8 @@ const { JSONFile } = require('lowdb/node');
 const path = require('path');
 const http = require('http');
 const crypto = require('crypto');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const app = express();
 app.use(cors());
@@ -13,10 +15,11 @@ app.use(express.json());
 const PORT = 3000;
 const dbPath = path.join(__dirname, 'db.json');
 const adapter = new JSONFile(dbPath);
-const db = new Low(adapter, { opcList: [], applications: [], stars: [] });
+const db = new Low(adapter, { opcList: [], applications: [], stars: [], users: [] });
 
 const OLLAMA_URL = 'http://localhost:11434';
 const OLLAMA_MODEL = 'qwen2.5:0.5b';
+const JWT_SECRET = 'opc-secret-key-2026'; // 生产环境应从环境变量读取
 
 // Helper: call Ollama chat API
 function ollamaChat(messages) {
@@ -52,6 +55,153 @@ function getUserId(req) {
   }
 }
 
+// ==================== Auth Middleware ====================
+
+// JWT 验证中间件
+function authMiddleware(req, res, next) {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+  
+  if (!token) {
+    return res.status(401).json({ error: '未登录，请先登录' });
+  }
+  
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ error: 'token 无效或已过期' });
+    }
+    req.user = user;
+    next();
+  });
+}
+
+// ==================== Auth Routes ====================
+
+// POST /auth/register — 注册
+app.post('/auth/register', async (req, res) => {
+  try {
+    await db.read();
+    db.data.users = db.data.users || [];
+    
+    const { username, password, email } = req.body;
+    
+    // 验证必填字段
+    if (!username || !password) {
+      return res.status(400).json({ error: '用户名和密码不能为空' });
+    }
+    
+    // 检查用户名是否已存在
+    const existingUser = db.data.users.find(u => u.username === username);
+    if (existingUser) {
+      return res.status(400).json({ error: '用户名已存在' });
+    }
+    
+    // 加密密码
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // 创建用户
+    const user = {
+      id: 'user_' + Date.now(),
+      username,
+      password: hashedPassword,
+      email: email || '',
+      createdAt: new Date().toISOString()
+    };
+    
+    db.data.users.push(user);
+    await db.write();
+    
+    // 生成 JWT token
+    const token = jwt.sign(
+      { userId: user.id, username: user.username },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email
+      }
+    });
+  } catch (err) {
+    console.error('Register error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /auth/login — 登录
+app.post('/auth/login', async (req, res) => {
+  try {
+    await db.read();
+    db.data.users = db.data.users || [];
+    
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ error: '用户名和密码不能为空' });
+    }
+    
+    // 查找用户
+    const user = db.data.users.find(u => u.username === username);
+    if (!user) {
+      return res.status(401).json({ error: '用户名或密码错误' });
+    }
+    
+    // 验证密码
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(401).json({ error: '用户名或密码错误' });
+    }
+    
+    // 生成 JWT token
+    const token = jwt.sign(
+      { userId: user.id, username: user.username },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+    
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email
+      }
+    });
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /auth/me — 获取当前用户信息
+app.get('/auth/me', authMiddleware, async (req, res) => {
+  try {
+    await db.read();
+    db.data.users = db.data.users || [];
+    
+    const user = db.data.users.find(u => u.id === req.user.userId);
+    if (!user) {
+      return res.status(404).json({ error: '用户不存在' });
+    }
+    
+    res.json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      createdAt: user.createdAt
+    });
+  } catch (err) {
+    console.error('Get user error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ==================== OPC CRUD ====================
 
 // GET /opc/list
@@ -71,14 +221,39 @@ app.get('/opc/detail/:id', async (req, res) => {
 // POST /opc/publish
 app.post('/opc/publish', async (req, res) => {
   await db.read();
+  
+  // 尝试从 JWT 获取用户 ID，如果没有则用 contact 作为临时标识
+  let creatorId = null;
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  
+  if (token) {
+    try {
+      const decoded = jwt.verify(token, JWT_SECRET);
+      creatorId = decoded.userId;
+    } catch (e) {
+      // token 无效，继续用 contact 作为标识
+    }
+  }
+  
   const { name, description, tags, price, contact, category, requiredSkills, collaborationType, experienceLevel, timeCommitment } = req.body;
   if (!name || !contact) return res.status(400).json({ error: 'missing required fields' });
+  
   const newOpc = {
-    id: Date.now(), name, description: description || '', tags: tags || '', price: price || '', contact,
-    category: category || 'other', requiredSkills: requiredSkills || [],
-    collaborationType: collaborationType || 'once', experienceLevel: experienceLevel || 'any',
+    id: Date.now(), 
+    name, 
+    description: description || '', 
+    tags: tags || '', 
+    price: price || '', 
+    contact,
+    creatorId: creatorId || contact, // 优先用 userId，否则用 contact
+    category: category || 'other', 
+    requiredSkills: requiredSkills || [],
+    collaborationType: collaborationType || 'once', 
+    experienceLevel: experienceLevel || 'any',
     timeCommitment: timeCommitment || '',
   };
+  
   db.data.opcList.push(newOpc);
   await db.write();
   res.json({ success: true, opc: newOpc });
@@ -177,6 +352,21 @@ app.post('/opc/apply', async (req, res) => {
   try {
     await db.read();
     db.data.applications = db.data.applications || [];
+    
+    // 尝试从 JWT 获取用户 ID
+    let applicantId = null;
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, JWT_SECRET);
+        applicantId = decoded.userId;
+      } catch (e) {
+        // token 无效，继续用 contact 作为标识
+      }
+    }
+    
     const { opcId, applicantName, applicantContact, message } = req.body;
     if (!opcId || !applicantName || !applicantContact) {
       return res.status(400).json({ error: 'opcId, applicantName, applicantContact are required' });
@@ -190,6 +380,7 @@ app.post('/opc/apply', async (req, res) => {
       opcId: Number(opcId),
       applicantName,
       applicantContact,
+      applicantId: applicantId || applicantContact, // 优先用 userId，否则用 contact
       message: message || '',
       status: 'pending',
       createdAt: new Date().toISOString()
@@ -291,18 +482,17 @@ app.get('/opc/star/:id', async (req, res) => {
 
 // ==================== My Applications ====================
 
-// GET /opc/my-applications/received?contact=xxx — 获取我收到的申请（我创建的OPC的申请）
-app.get('/opc/my-applications/received', async (req, res) => {
+// GET /opc/my-applications/received — 获取我收到的申请（我创建的OPC的申请）
+app.get('/opc/my-applications/received', authMiddleware, async (req, res) => {
   try {
     await db.read();
     db.data.applications = db.data.applications || [];
     db.data.opcList = db.data.opcList || [];
     
-    const contact = req.query.contact;
-    if (!contact) return res.status(400).json({ error: 'Missing contact parameter' });
+    const userId = req.user.userId;
     
     // 找到我创建的 OPC
-    const myOpcs = db.data.opcList.filter(opc => opc.contact === contact);
+    const myOpcs = db.data.opcList.filter(opc => opc.creatorId === userId);
     const myOpcIds = myOpcs.map(opc => opc.id);
     
     // 找到这些 OPC 的申请
@@ -320,19 +510,18 @@ app.get('/opc/my-applications/received', async (req, res) => {
   }
 });
 
-// GET /opc/my-applications/sent?contact=xxx — 获取我发起的申请
-app.get('/opc/my-applications/sent', async (req, res) => {
+// GET /opc/my-applications/sent — 获取我发起的申请
+app.get('/opc/my-applications/sent', authMiddleware, async (req, res) => {
   try {
     await db.read();
     db.data.applications = db.data.applications || [];
     db.data.opcList = db.data.opcList || [];
     
-    const contact = req.query.contact;
-    if (!contact) return res.status(400).json({ error: 'Missing contact parameter' });
+    const userId = req.user.userId;
     
-    // 找到我发起的申请
+    // 找到我发起的申请（根据 userId）
     const applications = db.data.applications
-      .filter(app => app.applicantContact === contact)
+      .filter(app => app.applicantId === userId)
       .map(app => {
         const opc = db.data.opcList.find(o => o.id === app.opcId);
         return { ...app, opcName: opc ? opc.name : `OPC #${app.opcId}` };
