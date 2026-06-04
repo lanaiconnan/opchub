@@ -534,6 +534,112 @@ app.get('/opc/my-applications/sent', authMiddleware, async (req, res) => {
   }
 });
 
+// ==================== Embedding 系统 ====================
+
+// Helper: call Ollama embedding API
+function ollamaEmbed(text) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({ model: 'nomic-embed-text', prompt: text });
+    const opts = {
+      hostname: 'localhost', port: 11434, path: '/api/embeddings', method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+    };
+    const req = http.request(opts, res => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try { resolve(JSON.parse(data).embedding); }
+        catch (e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+// Helper: cosine similarity
+function cosineSimilarity(a, b) {
+  if (!a || !b || a.length !== b.length) return 0;
+  let dot = 0, normA = 0, normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  return normA && normB ? dot / (Math.sqrt(normA) * Math.sqrt(normB)) : 0;
+}
+
+// Helper: build OPC text for embedding
+function buildOpcText(opc) {
+  const parts = [
+    opc.name || '',
+    opc.description || '',
+    opc.tags || '',
+    (opc.requiredSkills || []).join(', ')
+  ].filter(Boolean);
+  return parts.join(' ');
+}
+
+// POST /opc/embed/:id — generate and save embedding for an OPC
+app.post('/opc/embed/:id', async (req, res) => {
+  try {
+    await db.read();
+    const opc = db.data.opcList.find(i => i.id === Number(req.params.id));
+    if (!opc) return res.status(404).json({ error: 'OPC not found' });
+    
+    const text = buildOpcText(opc);
+    const embedding = await ollamaEmbed(text);
+    
+    opc.embedding = embedding;
+    opc.embeddingUpdatedAt = new Date().toISOString();
+    await db.write();
+    
+    res.json({ success: true, embeddingLength: embedding.length });
+  } catch (err) {
+    console.error('Embed error:', err);
+    res.status(500).json({ error: 'Embedding failed: ' + err.message });
+  }
+});
+
+// Enhanced GET /opc/match/:id — 相似推荐（向量版）
+app.get('/opc/match/:id', async (req, res) => {
+  await db.read();
+  const target = db.data.opcList.find(i => i.id === Number(req.params.id));
+  if (!target) return res.status(404).json({ error: 'OPC not found' });
+  
+  // 如果目标没有 embedding，先生成
+  if (!target.embedding) {
+    try {
+      const text = buildOpcText(target);
+      target.embedding = await ollamaEmbed(text);
+      await db.write();
+    } catch (err) {
+      console.error('Failed to embed target:', err);
+      // 降级到规则评分
+      return res.json([]);
+    }
+  }
+  
+  // 计算与其他 OPC 的相似度
+  const scored = [];
+  for (const opc of db.data.opcList) {
+    if (opc.id === target.id) continue;
+    
+    // 如果没有 embedding，跳过（或异步生成）
+    if (!opc.embedding) continue;
+    
+    const similarity = cosineSimilarity(target.embedding, opc.embedding);
+    if (similarity > 0.1) {
+      scored.push({ ...opc, similarity });
+    }
+  }
+  
+  // 按相似度排序，取前 5
+  scored.sort((a, b) => b.similarity - a.similarity);
+  res.json(scored.slice(0, 5));
+});
+
 // ==================== Start Server ====================
 
 app.listen(PORT, () => {
