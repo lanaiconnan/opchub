@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ChatInput from '../components/ChatInput';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 import axios from 'axios';
 
 function ChatPage() {
@@ -20,7 +21,7 @@ function ChatPage() {
         setMessages([
           {
             role: 'assistant',
-            content: `你好！我是 **${res.data.name}** 的 AI 协作助手。\n\n你可以告诉我你的技能、经验或合作意向，我会帮你生成沟通文案、匹配建议和合作提案。`,
+            content: `你好！我是 **${res.data.name}** 的 AI 协作助手 🤖\n\n## 我可以帮你\n\n- 📝 **生成沟通文案** — 帮你写专业的合作提案\n- 💡 **匹配建议** — 根据你的技能推荐协作方向\n- 📋 **合作提案** — 制定清晰的任务分工和时间表\n\n> 告诉我你的技能、经验或合作意向，我会给出具体建议。\n\n\`\`\`\n示例：我是前端开发，熟悉 React 和 TypeScript\n\`\`\``,
           }
         ]);
       })
@@ -122,9 +123,10 @@ function ChatPage() {
                 color: msg.role === 'user' ? '#fff' : '#1F2328',
               }}
             >
-              {msg.content.split('\n').map((line, i) => (
-                <p key={i} style={{ margin: '4px 0' }}>{line}</p>
-              ))}
+              <MarkdownRenderer
+                content={msg.content}
+                variant={msg.role === 'user' ? 'dark' : 'light'}
+              />
             </div>
           </div>
         ))}
