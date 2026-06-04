@@ -1,4 +1,4 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 
 /**
@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
  */
 function RequireAuth({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
+  const location = useLocation();
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -50,8 +51,8 @@ function RequireAuth({ children }) {
   }
 
   if (!isAuthenticated) {
-    // 未登录，跳转到登录页
-    return <Navigate to="/login" replace />;
+    // 未登录，跳转到登录页，并保存当前路径
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return children;

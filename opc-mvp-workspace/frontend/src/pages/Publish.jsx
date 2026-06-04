@@ -21,7 +21,7 @@ function Publish() {
 
   useEffect(() => {
     if (editId) {
-      axios.get(`http://localhost:3000/opc/detail/${editId}`)
+      axios.get(`/opc/detail/${editId}`)
         .then(res => {
           const d = res.data;
           setName(d.name || '');
@@ -36,6 +36,10 @@ function Publish() {
           setTimeCommitment(d.timeCommitment || '');
         })
         .catch(err => alert('加载失败：' + err.message));
+    } else {
+      // 新发布时，读取上次保存的联系人信息
+      const savedContact = localStorage.getItem('userContact');
+      if (savedContact) setContact(savedContact);
     }
   }, [editId]);
 

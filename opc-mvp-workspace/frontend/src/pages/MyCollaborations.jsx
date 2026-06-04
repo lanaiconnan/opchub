@@ -8,7 +8,7 @@ function MyCollaborations() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get('http://localhost:3000/opc/list')
+    axios.get('/opc/list')
       .then(res => {
         setOpcList(res.data);
         setLoading(false);
@@ -18,7 +18,7 @@ function MyCollaborations() {
 
   const handleDelete = (id, name) => {
     if (!window.confirm(`确定删除「${name}」？`)) return;
-    axios.delete(`http://localhost:3000/opc/delete/${id}`)
+    axios.delete(`/opc/delete/${id}`)
       .then(() => {
         alert('删除成功！');
         setOpcList(prev => prev.filter(opc => opc.id !== id));

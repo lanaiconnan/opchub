@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 
 function Register() {
   const [username, setUsername] = useState('');
@@ -9,6 +9,8 @@ function Register() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from?.pathname || '/';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -43,8 +45,8 @@ function Register() {
         // 注册成功后自动登录
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
-        // 强制刷新页面，确保 Navbar 重新渲染
-        window.location.href = '/';
+        // 跳转到来源页面，或默认首页
+        window.location.href = from;
       } else {
         setError(data.error || '注册失败');
       }
