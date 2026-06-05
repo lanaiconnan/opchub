@@ -7,26 +7,30 @@ const http = require('http');
 const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-const PORT = 3000;
-const dbPath = path.join(__dirname, 'db.json');
+const PORT = process.env.PORT || 3000;
+const dbPath = path.join(__dirname, process.env.DB_PATH || 'db.json');
 const adapter = new JSONFile(dbPath);
 const db = new Low(adapter, { opcList: [], applications: [], stars: [], users: [] });
 
-const OLLAMA_URL = 'http://localhost:11434';
-const OLLAMA_MODEL = 'qwen2.5:0.5b';
-const JWT_SECRET = 'opc-secret-key-2026'; // 生产环境应从环境变量读取
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+const OLLAMA_URL_OBJ = new URL(OLLAMA_URL);
+const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:0.5b';
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const OLLAMA_EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || 'nomic-embed-text';
 
 // Helper: call Ollama chat API
 function ollamaChat(messages) {
   return new Promise((resolve, reject) => {
     const body = JSON.stringify({ model: OLLAMA_MODEL, messages, stream: false });
     const opts = {
-      hostname: 'localhost', port: 11434, path: '/api/chat', method: 'POST',
+      hostname: OLLAMA_URL_OBJ.hostname, port: Number(OLLAMA_URL_OBJ.port || 80), path: '/api/chat', method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
       timeout: 30000,
     };
@@ -115,7 +119,7 @@ app.post('/auth/register', async (req, res) => {
     const token = jwt.sign(
       { userId: user.id, username: user.username },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: JWT_EXPIRES_IN }
     );
     
     res.json({
@@ -161,7 +165,7 @@ app.post('/auth/login', async (req, res) => {
     const token = jwt.sign(
       { userId: user.id, username: user.username },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: JWT_EXPIRES_IN }
     );
     
     res.json({
@@ -539,9 +543,9 @@ app.get('/opc/my-applications/sent', authMiddleware, async (req, res) => {
 // Helper: call Ollama embedding API
 function ollamaEmbed(text) {
   return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ model: 'nomic-embed-text', prompt: text });
+    const body = JSON.stringify({ model: OLLAMA_EMBED_MODEL, prompt: text });
     const opts = {
-      hostname: 'localhost', port: 11434, path: '/api/embeddings', method: 'POST',
+      hostname: OLLAMA_URL_OBJ.hostname, port: Number(OLLAMA_URL_OBJ.port || 80), path: '/api/embeddings', method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
     };
     const req = http.request(opts, res => {
