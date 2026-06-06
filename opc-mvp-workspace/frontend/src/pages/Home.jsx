@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ChatInput from '../components/ChatInput';
-import axios from 'axios';
+import api from '../utils/api';
 
 // -------- 常量 --------
 const CATEGORY_OPTIONS = [
@@ -104,13 +104,10 @@ function Home() {
 
   // 获取 Star 数据
   const fetchStarData = async (opcIds) => {
-    const token = localStorage.getItem('token');
     const data = {};
     for (const id of opcIds) {
       try {
-        const res = await axios.get(`/opc/star/${id}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
+        const res = await api.get(`/opc/star/${id}`);
         data[id] = { count: res.data.count || 0, starred: res.data.starred || false };
       } catch {
         data[id] = { count: 0, starred: false };
@@ -122,15 +119,8 @@ function Home() {
   // 切换 Star
   const toggleStar = async (opcId, e) => {
     e.stopPropagation();
-    const token = localStorage.getItem('token');
-    if (!token) {
-      navigate('/login');
-      return;
-    }
     try {
-      const res = await axios.post(`/opc/star/${opcId}`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.post(`/opc/star/${opcId}`, {});
       setStarData(prev => ({
         ...prev,
         [opcId]: { count: res.data.count, starred: res.data.starred },
@@ -142,14 +132,11 @@ function Home() {
 
   // 提交申请
   const submitApplication = async (form) => {
-    const token = localStorage.getItem('token');
     setApplyLoading(true);
     try {
-      await axios.post('/opc/apply', {
+      await api.post('/opc/apply', {
         opcId: selectedOpc.id,
         ...form,
-      }, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
       alert('✅ 申请已提交！');
       setShowApplyModal(false);
@@ -163,7 +150,7 @@ function Home() {
   const fetchRecommendations = async (opcId) => {
     setLoadingRec(true);
     try {
-      const res = await axios.get(`/opc/match/${opcId}`);
+      const res = await api.get(`/opc/match/${opcId}`);
       setRecommendations(res.data);
     } catch {
       setRecommendations([]);
@@ -172,7 +159,7 @@ function Home() {
   };
 
   useEffect(() => {
-    axios.get('/opc/list')
+    api.get('/opc/list')
       .then(res => {
         setOpcList(res.data);
         setLoading(false);
@@ -184,7 +171,6 @@ function Home() {
   // 前端搜索 + 筛选
   const filteredList = useMemo(() => {
     return opcList.filter(opc => {
-      // 搜索：name / description / tags / requiredSkills
       if (search.trim()) {
         const q = search.toLowerCase();
         const haystack = [
@@ -547,7 +533,7 @@ const styles = {
     border: '1px solid #d0d7de',
   },
   cardDesc: {
-    color: '#656d',
+    color: '#656d76',
     fontSize: '14px',
     marginBottom: '8px',
   },

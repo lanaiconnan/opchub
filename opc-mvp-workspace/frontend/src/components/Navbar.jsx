@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 export default function Navbar() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-  
+
   // 读取 localStorage
   const readUser = () => {
     const userStr = localStorage.getItem('user');
@@ -17,33 +17,45 @@ export default function Navbar() {
     }
     return null;
   };
-  
+
   useEffect(() => {
     setUser(readUser());
-  }, [navigate]); // navigate 变化时重新读取
-  
+  }, [navigate]);
+
   const handleLogout = () => {
-    localStorage.removeItem('token');
+    const rt = localStorage.getItem('refreshToken');
+    // 通知后端使 refresh token 失效（尽力而为，失败也不阻塞登出）
+    if (rt) {
+      fetch('/opc/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: rt }),
+      }).catch(() => {});
+    }
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
     setUser(null);
     navigate('/');
   };
-  
+
+  const isLoggedIn = !!localStorage.getItem('accessToken');
+
   return (
     <nav style={styles.nav}>
       <div style={styles.left}>
         <Link to="/" style={styles.logo}>🤝 OPC协作网络</Link>
       </div>
       <div style={styles.right}>
-        {user && (
+        {isLoggedIn && (
           <>
             <Link to="/my-applications" style={styles.link}>我的申请</Link>
             <Link to="/publish" style={styles.btnGreen}>New OPC</Link>
           </>
         )}
-        {user ? (
+        {isLoggedIn ? (
           <div style={styles.userSection}>
-            <span style={styles.username}>{user.username}</span>
+            <span style={styles.username}>{user?.username}</span>
             <button onClick={handleLogout} style={styles.logoutBtn}>登出</button>
           </div>
         ) : (

@@ -22,7 +22,9 @@ const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const OLLAMA_URL_OBJ = new URL(OLLAMA_URL);
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'qwen2.5:0.5b';
 const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '15m';
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || JWT_SECRET + '_refresh';
+const REFRESH_TOKEN_EXPIRES_IN = process.env.REFRESH_TOKEN_EXPIRES_IN || '30d';
 const OLLAMA_EMBED_MODEL = process.env.OLLAMA_EMBED_MODEL || 'nomic-embed-text';
 
 // Helper: call Ollama chat API
@@ -57,6 +59,41 @@ function getUserId(req) {
   } catch (e) {
     return 'anonymous-' + Date.now();
   }
+}
+
+// Password strength validation
+function validatePassword(password) {
+  if (!password || password.length < 8) {
+    return { valid: false, message: '密码长度至少8位' };
+  }
+  if (!/[a-z]/.test(password)) {
+    return { valid: false, message: '密码需包含至少1个小写字母' };
+  }
+  if (!/[A-Z]/.test(password)) {
+    return { valid: false, message: '密码需包含至少1个大写字母' };
+  }
+  if (!/[0-9]/.test(password)) {
+    return { valid: false, message: '密码需包含至少1个数字' };
+  }
+  return { valid: true };
+}
+
+// Generate access token
+function generateAccessToken(user) {
+  return jwt.sign(
+    { userId: user.id, username: user.username },
+    JWT_SECRET,
+    { expiresIn: JWT_EXPIRES_IN }
+  );
+}
+
+// Generate refresh token
+function generateRefreshToken(user) {
+  return jwt.sign(
+    { userId: user.id, username: user.username, type: 'refresh' },
+    REFRESH_TOKEN_SECRET,
+    { expiresIn: REFRESH_TOKEN_EXPIRES_IN }
+  );
 }
 
 // ==================== Auth Middleware ====================
@@ -94,6 +131,12 @@ app.post('/auth/register', async (req, res) => {
       return res.status(400).json({ error: '用户名和密码不能为空' });
     }
     
+    // 验证密码强度
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.valid) {
+      return res.status(400).json({ error: '密码强度不足：' + passwordCheck.message });
+    }
+    
     // 检查用户名是否已存在
     const existingUser = db.data.users.find(u => u.username === username);
     if (existingUser) {
@@ -115,16 +158,19 @@ app.post('/auth/register', async (req, res) => {
     db.data.users.push(user);
     await db.write();
     
-    // 生成 JWT token
-    const token = jwt.sign(
-      { userId: user.id, username: user.username },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
-    );
+    // 生成 tokens
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+    
+    // 保存 refresh token
+    user.refreshTokens = user.refreshTokens || [];
+    user.refreshTokens.push(refreshToken);
+    await db.write();
     
     res.json({
       success: true,
-      token,
+      accessToken,
+      refreshToken,
       user: {
         id: user.id,
         username: user.username,
@@ -161,16 +207,19 @@ app.post('/auth/login', async (req, res) => {
       return res.status(401).json({ error: '用户名或密码错误' });
     }
     
-    // 生成 JWT token
-    const token = jwt.sign(
-      { userId: user.id, username: user.username },
-      JWT_SECRET,
-      { expiresIn: JWT_EXPIRES_IN }
-    );
+    // 生成 tokens
+    const accessToken = generateAccessToken(user);
+    const refreshToken = generateRefreshToken(user);
+    
+    // 保存 refresh token
+    user.refreshTokens = user.refreshTokens || [];
+    user.refreshTokens.push(refreshToken);
+    await db.write();
     
     res.json({
       success: true,
-      token,
+      accessToken,
+      refreshToken,
       user: {
         id: user.id,
         username: user.username,
@@ -466,6 +515,86 @@ app.post('/opc/star/:id', async (req, res) => {
     res.json({ success: true, starred: idx === -1, count: starRecord.count });
   } catch (err) {
     console.error('Star error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==================== Auth: Refresh & Logout ====================
+
+// POST /auth/refresh — 刷新 access token
+app.post('/auth/refresh', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'refreshToken required' });
+    }
+    
+    // 验证 refresh token
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
+    } catch (e) {
+      return res.status(403).json({ error: 'refresh token 无效或已过期' });
+    }
+    
+    if (decoded.type !== 'refresh') {
+      return res.status(403).json({ error: 'invalid refresh token' });
+    }
+    
+    // 查找用户并验证 refresh token 是否存在
+    await db.read();
+    db.data.users = db.data.users || [];
+    const user = db.data.users.find(u => u.id === decoded.userId);
+    if (!user || !user.refreshTokens || !user.refreshTokens.includes(refreshToken)) {
+      return res.status(403).json({ error: 'refresh token 已失效，请重新登录' });
+    }
+    
+    // 生成新的 access token
+    const newAccessToken = generateAccessToken(user);
+    
+    // Refresh token rotation: 生成新的 refresh token，替换旧的
+    const newRefreshToken = generateRefreshToken(user);
+    user.refreshTokens = user.refreshTokens.filter(t => t !== refreshToken);
+    user.refreshTokens.push(newRefreshToken);
+    await db.write();
+    
+    res.json({
+      success: true,
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken
+    });
+  } catch (err) {
+    console.error('Refresh error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /auth/logout — 登出（使 refresh token 失效）
+app.post('/auth/logout', async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res.status(400).json({ error: 'refreshToken required' });
+    }
+    
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, REFRESH_TOKEN_SECRET);
+    } catch (e) {
+      return res.json({ success: true }); // token 已失效，直接返回成功
+    }
+    
+    await db.read();
+    db.data.users = db.data.users || [];
+    const user = db.data.users.find(u => u.id === decoded.userId);
+    if (user && user.refreshTokens) {
+      user.refreshTokens = user.refreshTokens.filter(t => t !== refreshToken);
+      await db.write();
+    }
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Logout error:', err);
     res.status(500).json({ error: err.message });
   }
 });

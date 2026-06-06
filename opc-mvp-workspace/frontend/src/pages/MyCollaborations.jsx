@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../utils/api';
 
 function MyCollaborations() {
   const navigate = useNavigate();
@@ -8,7 +8,7 @@ function MyCollaborations() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    axios.get('/opc/list')
+    api.get('/opc/list')
       .then(res => {
         setOpcList(res.data);
         setLoading(false);
@@ -18,7 +18,7 @@ function MyCollaborations() {
 
   const handleDelete = (id, name) => {
     if (!window.confirm(`确定删除「${name}」？`)) return;
-    axios.delete(`/opc/delete/${id}`)
+    api.delete(`/opc/delete/${id}`)
       .then(() => {
         alert('删除成功！');
         setOpcList(prev => prev.filter(opc => opc.id !== id));

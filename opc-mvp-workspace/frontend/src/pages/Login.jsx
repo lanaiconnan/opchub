@@ -30,8 +30,10 @@ function Login() {
       const data = await res.json();
       
       if (data.success) {
-        // 保存 token 到 localStorage
-        localStorage.setItem('token', data.token);
+        // 保存 tokens 到 localStorage
+        localStorage.setItem('accessToken', data.accessToken);
+        localStorage.setItem('refreshToken', data.refreshToken);
+        localStorage.removeItem('token'); // 清理旧字段
         localStorage.setItem('user', JSON.stringify(data.user));
         // 跳转到来源页面，或默认首页
         window.location.href = from;

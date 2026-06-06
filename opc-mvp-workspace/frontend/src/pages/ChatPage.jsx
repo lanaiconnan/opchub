@@ -2,9 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ChatInput from '../components/ChatInput';
 import MarkdownRenderer from '../components/MarkdownRenderer';
-import axios from 'axios';
+import api from '../utils/api';
 
-// -------- 常量映射 --------
+// ------- 常量映射 --------
 const categoryMap = {
   web: '🌐',
   mobile: '📱',
@@ -33,7 +33,7 @@ const expLevelMap = {
   any: '不限',
 };
 
-// -------- 申请弹窗 --------
+// ------- 申请弹窗 --------
 function ApplyModal({ onClose, onSubmit, loading }) {
   const [message, setMessage] = useState('');
 
@@ -67,7 +67,7 @@ function ApplyModal({ onClose, onSubmit, loading }) {
   );
 }
 
-// -------- 主页面 --------
+// ------- 主页面 --------
 function ChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -84,16 +84,16 @@ function ChatPage() {
 
   // 获取 OPC 详情 + Star 状态
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken');
 
-    axios.get(`/opc/detail/${id}`)
+    api.get(`/opc/detail/${id}`)
       .then(res => {
         setOpc(res.data);
         setLoading(false);
         setMessages([
           {
             role: 'assistant',
-            content: `你好！我是 **${res.data.name}** 的 AI 协作助手 🤖\n\n## 我可以帮你\n\n- 📝 **生成沟通文案** — 帮你写专业的合作提案\n- 💡 **匹配建议** — 根据你的技能推荐协作方向\n- 📋 **合作提案** — 制定清晰的任务分工和时间表\n\n> 告诉我你的技能、经验或合作意向，我会给出具体建议。\n\n\`\`\`\n示例：我是前端开发，熟悉 React 和 TypeScript\n\`\`\``,
+            content: `你好！我是 **${res.data.name}** 的 AI 协作助手 🤖\n\n## 我可以帮你\n\n- 📝 **生成沟通文案** — 帮你写专业的合作提案\n- 💡 **匹配建议** — 根据你的技能推荐协作方向\n- 📋 **合作提案** — 制定清晰的任务分工和时间表\n\n> 告诉我你的技能、经验或合作意向，我会给出具体建议。\n\n\`\`\`\n示例：我是前端开发，熟悉 React 和 TypeScript\n\`\`\`\n`,
           }
         ]);
       })
@@ -103,15 +103,13 @@ function ChatPage() {
       });
 
     // Star 数量
-    axios.get(`/opc/star/${id}`)
+    api.get(`/opc/star/${id}`)
       .then(res => setStarCount(res.data.count || 0))
       .catch(() => {});
 
     // 当前用户 Star 状态
     if (token) {
-      axios.get(`/opc/star/${id}/check`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      api.get(`/opc/star/${id}/check`)
         .then(res => setStarred(res.data.starred || false))
         .catch(() => {});
     }
@@ -123,16 +121,14 @@ function ChatPage() {
 
   // Star 切换
   const handleToggleStar = async () => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken');
     if (!token) {
       navigate('/login');
       return;
     }
     setStarLoading(true);
     try {
-      const res = await axios.post(`/opc/star/${id}`, {}, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.post(`/opc/star/${id}`, {});
       setStarred(res.data.starred);
       setStarCount(res.data.count);
     } catch (err) {
@@ -143,18 +139,16 @@ function ChatPage() {
 
   // 提交申请
   const handleApply = async (message) => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken');
     if (!token) {
       navigate('/login');
       return;
     }
     setApplyLoading(true);
     try {
-      await axios.post('/opc/apply', {
+      await api.post('/opc/apply', {
         opcId: parseInt(id),
         message,
-      }, {
-        headers: { Authorization: `Bearer ${token}` },
       });
       alert('✅ 申请已提交！');
       setShowApplyModal(false);
@@ -180,7 +174,7 @@ function ChatPage() {
         .filter(m => m.role === 'user' || m.role === 'assistant')
         .map(m => ({ role: m.role, content: m.content }));
 
-      const res = await axios.post('/opc/chat', {
+      const res = await api.post('/opc/chat', {
         opcId: parseInt(id),
         messages: chatHistory,
       });
@@ -333,7 +327,7 @@ function ChatPage() {
 
 export default ChatPage;
 
-// -------- 样式 --------
+// ------- 样式 -------
 const styles = {
   container: {
     maxWidth: '800px',

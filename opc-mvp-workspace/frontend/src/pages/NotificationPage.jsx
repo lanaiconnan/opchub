@@ -1,6 +1,7 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ToastContext from '../context/ToastContext';
+import api from '../utils/api';
 
 export default function NotificationPage() {
   const [applications, setApplications] = useState([]);
@@ -8,7 +9,7 @@ export default function NotificationPage() {
   const { showToast } = useContext(ToastContext);
   const navigate = useNavigate();
 
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('accessToken');
 
   useEffect(() => {
     if (!token) {
@@ -22,13 +23,10 @@ export default function NotificationPage() {
   async function fetchApplications() {
     setLoading(true);
     try {
-      const res = await fetch(`<SIGNED_URL_REMOVED> {
-        headers: { 'Authorization': 'Bearer ' + token },
-      });
-      const data = await res.json();
-      setApplications(data.applications || []);
+      const res = await api.get('/opc/my-applications/received');
+      setApplications(res.data.applications || []);
     } catch (err) {
-      showToast('加载失败: ' + err.message, 'error');
+      showToast('加载失败: ' + (err.response?.data?.error || err.message), 'error');
     } finally {
       setLoading(false);
     }
@@ -36,15 +34,8 @@ export default function NotificationPage() {
 
   async function handleUpdateStatus(id, status) {
     try {
-      const res = await fetch(`<SIGNED_URL_REMOVED> + id, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token,
-        },
-        body: JSON.stringify({ status }),
-      });
-      const data = await res.json();
+      const res = await api.put(`/opc/application/${id}`, { status });
+      const data = res.data;
       if (data.success) {
         showToast('已' + (status === 'accepted' ? '接受' : '拒绝'), 'success');
         fetchApplications();
@@ -52,7 +43,7 @@ export default function NotificationPage() {
         showToast(data.error || '操作失败', 'error');
       }
     } catch (err) {
-      showToast('操作失败: ' + err.message, 'error');
+      showToast('操作失败: ' + (err.response?.data?.error || err.message), 'error');
     }
   }
 
