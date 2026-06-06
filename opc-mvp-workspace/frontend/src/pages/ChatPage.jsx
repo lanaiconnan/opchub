@@ -2,39 +2,24 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ChatInput from '../components/ChatInput';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import StatusMessage from '../components/StatusMessage';
 import api from '../utils/api';
+import { color, space, radius, fontSize, fontWeight, shadow, containerStyle } from '../styles/tokens';
 
-// ------- 常量映射 --------
-const categoryMap = {
-  web: '🌐',
-  mobile: '📱',
-  ai: '🤖',
-  data: '📊',
-  design: '🎨',
-  other: '📁',
+// -------- 常量映射 --------
+const CATEGORY_MAP = {
+  web:    { icon: '🌐', label: 'Web 开发' },
+  mobile: { icon: '📱', label: '移动开发' },
+  ai:     { icon: '🤖', label: 'AI / 机器学习' },
+  data:   { icon: '📊', label: '数据科学' },
+  design: { icon: '🎨', label: '设计' },
+  other:  { icon: '📁', label: '其他' },
 };
-const categoryLabelMap = {
-  web: 'Web 开发',
-  mobile: '移动开发',
-  ai: 'AI / 机器学习',
-  data: '数据科学',
-  design: '设计',
-  other: '其他',
-};
-const collabTypeMap = {
-  once: '一次性协作',
-  longterm: '长期合作',
-  research: '研究项目',
-};
-const expLevelMap = {
-  beginner: '初学者友好',
-  intermediate: '需要一定经验',
-  expert: '需要专家级',
-  any: '不限',
-};
+const COLLAB_MAP = { once: '一次性协作', longterm: '长期合作', research: '研究项目' };
+const EXP_MAP    = { beginner: '🌱 初学者友好', intermediate: '💡 需要经验', expert: '🏆 专家级', any: '不限' };
 
-// ------- 申请弹窗 --------
-function ApplyModal({ onClose, onSubmit, loading }) {
+// -------- 申请弹窗 --------
+function ApplyModal({ opc, onClose, onSubmit, loading }) {
   const [message, setMessage] = useState('');
 
   const handleSubmit = () => {
@@ -43,22 +28,21 @@ function ApplyModal({ onClose, onSubmit, loading }) {
   };
 
   return (
-    <div style={styles.modalOverlay}>
-      <div style={styles.modal}>
-        <h3 style={styles.modalTitle}>申请协作</h3>
-        <p style={styles.modalDesc}>向发布者说明你的技能、经验和合作意向</p>
+    <div style={s.modalOverlay} onClick={onClose}>
+      <div style={s.modal} onClick={e => e.stopPropagation()}>
+        <h3 style={s.modalTitle}>申请「{opc.name}」</h3>
+        <p style={s.modalDesc}>向发布者说明你的技能、经验和合作意向</p>
         <textarea
-          style={styles.modalTextarea}
+          style={s.modalTextarea}
           placeholder="例如：我是前端开发，熟悉 React 和 TypeScript，对您的项目很感兴趣..."
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={e => setMessage(e.target.value)}
           rows={6}
+          autoFocus
         />
-        <div style={styles.modalActions}>
-          <button onClick={onClose} style={styles.modalCancelBtn} disabled={loading}>
-            取消
-          </button>
-          <button onClick={handleSubmit} style={styles.modalSubmitBtn} disabled={loading}>
+        <div style={s.modalActions}>
+          <button onClick={onClose} style={s.btnCancel} disabled={loading}>取消</button>
+          <button onClick={handleSubmit} style={s.btnSubmit} disabled={loading || !message.trim()}>
             {loading ? '提交中...' : '提交申请'}
           </button>
         </div>
@@ -67,7 +51,7 @@ function ApplyModal({ onClose, onSubmit, loading }) {
   );
 }
 
-// ------- 主页面 --------
+// -------- 主页面 --------
 function ChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -82,74 +66,46 @@ function ChatPage() {
   const [applyLoading, setApplyLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
-  // 获取 OPC 详情 + Star 状态
+  // 获取 OPC 详情
   useEffect(() => {
-    const token = localStorage.getItem('accessToken');
-
     api.get(`/opc/detail/${id}`)
       .then(res => {
         setOpc(res.data);
         setLoading(false);
-        setMessages([
-          {
-            role: 'assistant',
-            content: `你好！我是 **${res.data.name}** 的 AI 协作助手 🤖\n\n## 我可以帮你\n\n- 📝 **生成沟通文案** — 帮你写专业的合作提案\n- 💡 **匹配建议** — 根据你的技能推荐协作方向\n- 📋 **合作提案** — 制定清晰的任务分工和时间表\n\n> 告诉我你的技能、经验或合作意向，我会给出具体建议。\n\n\`\`\`\n示例：我是前端开发，熟悉 React 和 TypeScript\n\`\`\`\n`,
-          }
-        ]);
+        setMessages([{
+          role: 'assistant',
+          content: `你好！我是 **${res.data.name}** 的 AI 协作助手 🤖\n\n## 我能帮你什么？\n\n- **生成沟通文案** — 帮你写专业的合作提案\n- **匹配建议** — 根据你的技能推荐协作方向\n- **合作方案** — 制定清晰的任务分工\n\n> 告诉我你的技能或合作意向，我会给出具体建议。`,
+        }]);
       })
-      .catch(() => {
-        alert('OPC 不存在');
-        navigate('/');
-      });
+      .catch(() => { alert('OPC 不存在'); navigate('/'); });
 
-    // Star 数量
-    api.get(`/opc/star/${id}`)
-      .then(res => setStarCount(res.data.count || 0))
-      .catch(() => {});
-
-    // 当前用户 Star 状态
+    api.get(`/opc/star/${id}`).then(r => setStarCount(r.data.count || 0)).catch(() => {});
+    const token = localStorage.getItem('accessToken');
     if (token) {
-      api.get(`/opc/star/${id}/check`)
-        .then(res => setStarred(res.data.starred || false))
-        .catch(() => {});
+      api.get(`/opc/star/${id}/check`).then(r => setStarred(r.data.starred || false)).catch(() => {});
     }
   }, [id]);
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  // Star 切换
   const handleToggleStar = async () => {
     const token = localStorage.getItem('accessToken');
-    if (!token) {
-      navigate('/login');
-      return;
-    }
+    if (!token) { navigate('/login'); return; }
     setStarLoading(true);
     try {
       const res = await api.post(`/opc/star/${id}`, {});
       setStarred(res.data.starred);
       setStarCount(res.data.count);
-    } catch (err) {
-      console.error('Star 操作失败', err);
-    }
+    } catch (err) { console.error('Star 失败', err); }
     setStarLoading(false);
   };
 
-  // 提交申请
   const handleApply = async (message) => {
     const token = localStorage.getItem('accessToken');
-    if (!token) {
-      navigate('/login');
-      return;
-    }
+    if (!token) { navigate('/login'); return; }
     setApplyLoading(true);
     try {
-      await api.post('/opc/apply', {
-        opcId: parseInt(id),
-        message,
-      });
+      await api.post('/opc/apply', { opcId: parseInt(id), message });
       alert('✅ 申请已提交！');
       setShowApplyModal(false);
     } catch (err) {
@@ -160,166 +116,91 @@ function ChatPage() {
 
   const handleSend = async (userMessage) => {
     if (!userMessage.trim() || sending) return;
-
     const userMsg = { role: 'user', content: userMessage };
     const loadingMsg = { role: 'assistant', content: '...' };
-
-    const newMessages = [...messages, userMsg, loadingMsg];
-    setMessages(newMessages);
+    setMessages(prev => [...prev, userMsg, loadingMsg]);
     setSending(true);
 
     try {
-      const chatHistory = newMessages
-        .slice(0, -1)
+      const history = messages
         .filter(m => m.role === 'user' || m.role === 'assistant')
         .map(m => ({ role: m.role, content: m.content }));
-
-      const res = await api.post('/opc/chat', {
-        opcId: parseInt(id),
-        messages: chatHistory,
-      });
-
-      setMessages(prev => {
-        const updated = [...prev];
-        updated[updated.length - 1] = { role: 'assistant', content: res.data.reply };
-        return updated;
-      });
-    } catch (err) {
-      setMessages(prev => {
-        const updated = [...prev];
-        updated[updated.length - 1] = {
-          role: 'assistant',
-          content: '⚠️ AI 服务暂时不可用，请确认 Ollama 正在运行。',
-        };
-        return updated;
-      });
+      const res = await api.post('/opc/chat', { opcId: parseInt(id), messages: [...history, userMsg] });
+      setMessages(prev => { prev[prev.length - 1] = { role: 'assistant', content: res.data.reply }; return [...prev]; });
+    } catch {
+      setMessages(prev => { prev[prev.length - 1] = { role: 'assistant', content: '⚠️ AI 服务暂时不可用，请确认 Ollama 正在运行。' }; return [...prev]; });
     }
     setSending(false);
   };
 
-  if (loading) {
-    return <div style={styles.loading}>加载中...</div>;
-  }
+  if (loading) return <StatusMessage variant="loading" />;
+  if (!opc) return <StatusMessage variant="error" title="OPC 不存在" />;
+
+  const cat = CATEGORY_MAP[opc.category] || CATEGORY_MAP.other;
 
   return (
-    <div style={styles.container}>
-      {/* 顶部导航 */}
-      <div style={styles.header}>
-        <button onClick={() => navigate('/')} style={styles.backBtn}>
-          ← 返回列表
+    <div style={s.page}>
+      {/* 顶部 OPC 信息栏 */}
+      <div style={s.topBar}>
+        <button onClick={() => navigate('/')} style={s.backBtn}>← 返回</button>
+        <div style={s.topInfo}>
+          <span style={s.topCatIcon}>{cat.icon}</span>
+          <span style={s.topTitle}>{opc.name}</span>
+          <span style={s.topSub}>AI 协作助手</span>
+        </div>
+        <button onClick={handleToggleStar} style={s.starBtn} disabled={starLoading}>
+          {starred ? '⭐' : '☆'} {starCount}
         </button>
-        <div style={styles.headerInfo}>
-          <span style={styles.headerTitle}>🤝 {opc.name}</span>
-          <span style={styles.headerSub}>AI 协作助手</span>
-        </div>
       </div>
 
-      {/* OPC 详情卡片 */}
-      <div style={styles.opcCard}>
-        <div style={styles.opcCardHeader}>
-          <div style={styles.opcCardTitleRow}>
-            <span style={styles.opcCategoryIcon}>{categoryMap[opc.category] || '📁'}</span>
-            <h3 style={styles.opcTitle}>{opc.name}</h3>
+      {/* OPC 详情（可折叠） */}
+      <details style={s.opcDetails}>
+        <summary style={s.detailsToggle}>查看项目详情</summary>
+        <div style={s.opcCard}>
+          {opc.description && <p style={s.opcDesc}>{opc.description}</p>}
+          <div style={s.opcGrid}>
+            <div style={s.opcField}><span style={s.fieldLabel}>分类</span><span style={s.fieldValue}>{cat.label}</span></div>
+            <div style={s.opcField}><span style={s.fieldLabel}>协作类型</span><span style={s.fieldValue}>{COLLAB_MAP[opc.collaborationType] || '未设置'}</span></div>
+            <div style={s.opcField}><span style={s.fieldLabel}>经验要求</span><span style={s.fieldValue}>{EXP_MAP[opc.experienceLevel] || '不限'}</span></div>
+            {opc.timeCommitment && (
+              <div style={s.opcField}><span style={s.fieldLabel}>时间投入</span><span style={s.fieldValue}>{opc.timeCommitment}</span></div>
+            )}
           </div>
-          <div style={styles.starRow}>
-            <button onClick={handleToggleStar} style={styles.starBtn} disabled={starLoading}>
-              {starred ? '⭐' : '☆'} {starCount}
-            </button>
-          </div>
-        </div>
-
-        {opc.description && (
-          <p style={styles.opcDesc}>{opc.description}</p>
-        )}
-
-        <div style={styles.opcFieldGrid}>
-          <div style={styles.field}>
-            <span style={styles.fieldLabel}>分类</span>
-            <span style={styles.fieldValue}>{categoryLabelMap[opc.category] || '未设置'}</span>
-          </div>
-          <div style={styles.field}>
-            <span style={styles.fieldLabel}>协作类型</span>
-            <span style={styles.fieldValue}>{collabTypeMap[opc.collaborationType] || '未设置'}</span>
-          </div>
-          <div style={styles.field}>
-            <span style={styles.fieldLabel}>经验要求</span>
-            <span style={styles.fieldValue}>{expLevelMap[opc.experienceLevel] || '不限'}</span>
-          </div>
-          <div style={styles.field}>
-            <span style={styles.fieldLabel}>时间投入</span>
-            <span style={styles.fieldValue}>{opc.timeCommitment || '未设置'}</span>
-          </div>
-        </div>
-
-        {opc.requiredSkills && opc.requiredSkills.length > 0 && (
-          <div style={styles.skillsRow}>
-            <span style={styles.fieldLabel}>所需技能</span>
-            <div style={styles.skillsList}>
-              {opc.requiredSkills.map((s, i) => (
-                <span key={i} style={styles.skillTag}>{s}</span>
-              ))}
+          {opc.requiredSkills?.length > 0 && (
+            <div style={s.skillsSection}>
+              <span style={s.fieldLabel}>所需技能：</span>
+              <span style={s.skillsList}>{opc.requiredSkills.map(s => <span key={s} style={s.skillTag}>{s}</span>)}</span>
             </div>
+          )}
+          <div style={s.opcFooter}>
+            <button onClick={() => setShowApplyModal(true)} style={s.applyBtn}>🤝 申请协作</button>
+            <span style={s.contactInfo}>📞 {opc.contact}</span>
           </div>
-        )}
-
-        {opc.tags && (
-          <div style={styles.tagsRow}>
-            {opc.tags.split(',').map((t, i) => t.trim() && (
-              <span key={i} style={styles.tag}>{t.trim()}</span>
-            ))}
-          </div>
-        )}
-
-        <div style={styles.opcActions}>
-          <button onClick={() => setShowApplyModal(true)} style={styles.applyBtn}>
-            🤝 申请协作
-          </button>
-          <span style={styles.contactInfo}>📞 {opc.contact}</span>
         </div>
-      </div>
+      </details>
 
       {/* 对话区域 */}
-      <div style={styles.chatArea}>
+      <div style={s.chatArea}>
         {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            style={{
-              ...styles.message,
-              alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-            }}
-          >
-            {msg.role === 'assistant' && (
-              <span style={styles.avatar}>🤖</span>
-            )}
-            <div
-              style={{
-                ...styles.bubble,
-                backgroundColor: msg.role === 'user' ? '#2ea44f' : '#f6f8fa',
-                color: msg.role === 'user' ? '#fff' : '#1F2328',
-              }}
-            >
-              <MarkdownRenderer
-                content={msg.content}
-                variant={msg.role === 'user' ? 'dark' : 'light'}
-              />
+          <div key={idx} style={s.msgRow(msg.role)}>
+            {msg.role === 'assistant' && <span style={s.avatar}>🤖</span>}
+            <div style={s.bubble(msg.role)}>
+              <MarkdownRenderer content={msg.content} variant={msg.role === 'user' ? 'dark' : 'light'} />
             </div>
+            {msg.role === 'user' && <span style={s.avatarUser}>🧑</span>}
           </div>
         ))}
         <div ref={messagesEndRef} />
       </div>
 
       {/* 输入区域 */}
-      <div style={styles.inputArea}>
+      <div style={s.inputArea}>
         <ChatInput onSend={handleSend} disabled={sending} />
       </div>
 
       {/* 申请弹窗 */}
       {showApplyModal && (
-        <ApplyModal
-          onClose={() => setShowApplyModal(false)}
-          onSubmit={handleApply}
-          loading={applyLoading}
-        />
+        <ApplyModal opc={opc} onClose={() => setShowApplyModal(false)} onSubmit={handleApply} loading={applyLoading} />
       )}
     </div>
   );
@@ -327,261 +208,252 @@ function ChatPage() {
 
 export default ChatPage;
 
-// ------- 样式 -------
-const styles = {
-  container: {
-    maxWidth: '800px',
-    margin: '0 auto',
-    padding: '20px',
+// -------- 样式 --------
+const s = {
+  page: {
+    ...containerStyle,
     display: 'flex',
     flexDirection: 'column',
-    height: '95vh',
+    minHeight: 'calc(100vh - 56px)',
+    padding: `${space.md}px`,
   },
-  loading: {
-    textAlign: 'center',
-    padding: '60px',
-    color: '#656d76',
-    fontSize: '16px',
-  },
-  header: {
+  // 顶栏
+  topBar: {
     display: 'flex',
     alignItems: 'center',
-    gap: '16px',
-    paddingBottom: '16px',
-    borderBottom: '1px solid #d0d7de',
-    marginBottom: '16px',
+    gap: space.md,
+    padding: `${space.sm}px ${space.md}px`,
+    backgroundColor: color.surface,
+    border: `1px solid ${color.border}`,
+    borderRadius: radius.lg,
+    marginBottom: space.md,
   },
   backBtn: {
     backgroundColor: 'transparent',
-    border: '1px solid #d0d7de',
-    borderRadius: '6px',
-    padding: '6px 12px',
+    border: `1px solid ${color.border}`,
+    borderRadius: radius.md,
+    padding: `${space.xs}px ${space.sm}px`,
     cursor: 'pointer',
-    fontSize: '14px',
-    color: '#1F2328',
+    fontSize: fontSize.sm,
+    color: color.textPrimary,
+    whiteSpace: 'nowrap',
   },
-  headerInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  headerTitle: {
-    fontSize: '16px',
-    fontWeight: '600',
-    color: '#1F2328',
-  },
-  headerSub: {
-    fontSize: '12px',
-    color: '#656d76',
-  },
-  opcCard: {
-    backgroundColor: '#f6f8fa',
-    border: '1px solid #d0d7de',
-    borderRadius: '8px',
-    padding: '16px',
-    marginBottom: '16px',
-  },
-  opcCardHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '12px',
-  },
-  opcCardTitleRow: {
+  topInfo: {
+    flex: 1,
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: space.sm,
+    minWidth: 0,
   },
-  opcCategoryIcon: {
-    fontSize: '24px',
+  topCatIcon: { fontSize: '18px', flexShrink: 0 },
+  topTitle: {
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.semibold,
+    color: color.textPrimary,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
-  opcTitle: {
-    fontSize: '18px',
-    fontWeight: '600',
-    color: '#1F2328',
-    margin: 0,
-  },
-  starRow: {
+  topSub: {
+    fontSize: fontSize.xs,
+    color: color.textMuted,
     flexShrink: 0,
   },
   starBtn: {
     backgroundColor: 'transparent',
-    border: '1px solid #d0d7de',
-    borderRadius: '6px',
-    padding: '6px 12px',
+    border: `1px solid ${color.border}`,
+    borderRadius: radius.md,
+    padding: `${space.xs}px ${space.sm}px`,
     cursor: 'pointer',
-    fontSize: '14px',
-    color: '#1F2328',
+    fontSize: fontSize.sm,
+    color: color.textPrimary,
+    flexShrink: 0,
+  },
+  // OPC 详情
+  opcDetails: {
+    marginBottom: space.md,
+  },
+  detailsToggle: {
+    cursor: 'pointer',
+    fontSize: fontSize.sm,
+    color: color.info,
+    padding: `${space.xs}px 0`,
+    userSelect: 'none',
+  },
+  opcCard: {
+    backgroundColor: color.gray1,
+    border: `1px solid ${color.border}`,
+    borderRadius: radius.lg,
+    padding: space.lg,
+    marginTop: space.xs,
   },
   opcDesc: {
-    color: '#656d76',
-    fontSize: '14px',
-    marginBottom: '12px',
-    lineHeight: '1.6',
+    color: color.textSecondary,
+    fontSize: fontSize.base,
+    marginBottom: space.md,
+    lineHeight: 1.6,
   },
-  opcFieldGrid: {
+  opcGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: '8px',
-    marginBottom: '12px',
+    gap: space.sm,
+    marginBottom: space.md,
   },
-  field: {
+  opcField: {
     display: 'flex',
-    gap: '8px',
-    fontSize: '13px',
+    gap: space.xs,
+    fontSize: fontSize.sm,
   },
   fieldLabel: {
-    color: '#656d76',
-    fontWeight: '500',
+    color: color.textMuted,
+    fontWeight: fontWeight.medium,
   },
   fieldValue: {
-    color: '#1F2328',
+    color: color.textPrimary,
   },
-  skillsRow: {
-    marginBottom: '12px',
+  skillsSection: {
+    marginBottom: space.md,
   },
   skillsList: {
     display: 'flex',
     flexWrap: 'wrap',
-    gap: '6px',
-    marginTop: '6px',
+    gap: space.xs,
+    marginTop: space.xs,
   },
   skillTag: {
-    backgroundColor: '#f1f8ff',
-    color: '#0969da',
-    padding: '2px 8px',
-    borderRadius: '12px',
-    fontSize: '12px',
-    fontWeight: '500',
+    backgroundColor: color.infoLight,
+    color: color.info,
+    padding: `${space.xs}px ${space.xs}px`,
+    borderRadius: radius.full,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.medium,
   },
-  tagsRow: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: '6px',
-    marginBottom: '12px',
-  },
-  tag: {
-    backgroundColor: '#dafbe4',
-    color: '#116329',
-    padding: '2px 8px',
-    borderRadius: '12px',
-    fontSize: '11px',
-    fontWeight: '600',
-  },
-  opcActions: {
+  opcFooter: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingTop: '12px',
-    borderTop: '1px solid #d0d7de',
+    paddingTop: space.md,
+    borderTop: `1px solid ${color.border}`,
   },
   applyBtn: {
-    backgroundColor: '#2ea44f',
+    backgroundColor: color.primary,
     color: '#fff',
     border: 'none',
-    borderRadius: '6px',
-    padding: '8px 16px',
+    borderRadius: radius.md,
+    padding: `${space.sm}px ${space.lg}px`,
     cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.medium,
   },
   contactInfo: {
-    color: '#656d76',
-    fontSize: '13px',
+    fontSize: fontSize.sm,
+    color: color.textSecondary,
   },
+  // 对话区域
   chatArea: {
     flex: 1,
     overflowY: 'auto',
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px',
-    padding: '16px 0',
+    gap: space.md,
+    padding: `${space.sm}px 0`,
   },
-  message: {
+  msgRow: (role) => ({
     display: 'flex',
     alignItems: 'flex-start',
-    gap: '8px',
+    gap: space.sm,
+    justifyContent: role === 'user' ? 'flex-end' : 'flex-start',
     maxWidth: '80%',
-  },
+    alignSelf: role === 'user' ? 'flex-end' : 'flex-start',
+  }),
   avatar: {
     fontSize: '20px',
     flexShrink: 0,
     marginTop: '4px',
   },
-  bubble: {
-    padding: '12px 16px',
-    borderRadius: '12px',
-    fontSize: '14px',
-    lineHeight: '1.6',
-    whiteSpace: 'pre-wrap',
+  avatarUser: {
+    fontSize: '20px',
+    flexShrink: 0,
+    marginTop: '4px',
   },
+  bubble: (role) => ({
+    padding: `${space.sm}px ${space.md}px`,
+    borderRadius: role === 'user'
+      ? `${radius.xl}px ${radius.xl}px ${space.xs}px ${radius.xl}px`
+      : `${space.xs}px ${radius.xl}px ${radius.xl}px ${radius.xl}px`,
+    fontSize: fontSize.base,
+    lineHeight: 1.6,
+    maxWidth: '100%',
+    overflowWrap: 'break-word',
+    ...(role === 'user'
+      ? { backgroundColor: color.primary, color: '#fff' }
+      : { backgroundColor: color.gray1, color: color.textPrimary, border: `1px solid ${color.border}` }
+    ),
+  }),
   inputArea: {
-    borderTop: '1px solid #d0d7de',
-    paddingTop: '16px',
+    borderTop: `1px solid ${color.border}`,
+    paddingTop: space.md,
+    marginTop: space.sm,
   },
   // 弹窗
   modalOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    display: 'flex', justifyContent: 'center', alignItems: 'center',
     zIndex: 1000,
   },
   modal: {
-    backgroundColor: '#fff',
-    borderRadius: '12px',
-    padding: '24px',
-    maxWidth: '500px',
+    backgroundColor: color.surface,
+    borderRadius: radius.xl,
+    padding: space.xl,
     width: '90%',
+    maxWidth: '500px',
+    boxShadow: shadow.modal,
   },
   modalTitle: {
-    fontSize: '18px',
-    fontWeight: '600',
-    color: '#1F2328',
-    marginBottom: '8px',
+    fontSize: fontSize.xl,
+    fontWeight: fontWeight.semibold,
+    color: color.textPrimary,
+    marginBottom: space.xs,
   },
   modalDesc: {
-    color: '#656d76',
-    fontSize: '14px',
-    marginBottom: '16px',
+    fontSize: fontSize.base,
+    color: color.textSecondary,
+    marginBottom: space.lg,
   },
   modalTextarea: {
     width: '100%',
-    padding: '12px',
-    border: '1px solid #d0d7de',
-    borderRadius: '6px',
-    fontSize: '14px',
+    padding: space.sm,
+    border: `1px solid ${color.border}`,
+    borderRadius: radius.md,
+    fontSize: fontSize.base,
     fontFamily: 'inherit',
     resize: 'vertical',
-    marginBottom: '16px',
     boxSizing: 'border-box',
+    marginBottom: space.lg,
   },
   modalActions: {
     display: 'flex',
     justifyContent: 'flex-end',
-    gap: '8px',
+    gap: space.sm,
   },
-  modalCancelBtn: {
+  btnCancel: {
     backgroundColor: 'transparent',
-    border: '1px solid #d0d7de',
-    borderRadius: '6px',
-    padding: '8px 16px',
+    border: `1px solid ${color.border}`,
+    borderRadius: radius.md,
+    padding: `${space.sm}px ${space.lg}px`,
     cursor: 'pointer',
-    fontSize: '14px',
-    color: '#1F2328',
+    fontSize: fontSize.base,
+    color: color.textPrimary,
   },
-  modalSubmitBtn: {
-    backgroundColor: '#2ea44f',
+  btnSubmit: {
+    backgroundColor: color.primary,
     color: '#fff',
     border: 'none',
-    borderRadius: '6px',
-    padding: '8px 16px',
+    borderRadius: radius.md,
+    padding: `${space.sm}px ${space.lg}px`,
     cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.medium,
   },
 };

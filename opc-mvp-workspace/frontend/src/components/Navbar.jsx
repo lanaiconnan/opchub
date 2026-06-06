@@ -1,30 +1,20 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { color, space, fontSize, fontWeight } from '../styles/tokens';
 
 export default function Navbar() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
-
-  // 读取 localStorage
-  const readUser = () => {
-    const userStr = localStorage.getItem('user');
-    if (userStr) {
-      try {
-        return JSON.parse(userStr);
-      } catch (e) {
-        return null;
-      }
-    }
-    return null;
-  };
+  const isLoggedIn = !!localStorage.getItem('accessToken');
 
   useEffect(() => {
-    setUser(readUser());
-  }, [navigate]);
+    const raw = localStorage.getItem('user');
+    if (raw) { try { setUser(JSON.parse(raw)); } catch {} }
+    else      { setUser(null); }
+  }, [navigate, isLoggedIn]);
 
   const handleLogout = () => {
     const rt = localStorage.getItem('refreshToken');
-    // 通知后端使 refresh token 失效（尽力而为，失败也不阻塞登出）
     if (rt) {
       fetch('/opc/auth/logout', {
         method: 'POST',
@@ -39,109 +29,120 @@ export default function Navbar() {
     navigate('/');
   };
 
-  const isLoggedIn = !!localStorage.getItem('accessToken');
-
   return (
-    <nav style={styles.nav}>
-      <div style={styles.left}>
-        <Link to="/" style={styles.logo}>🤝 OPC协作网络</Link>
-      </div>
-      <div style={styles.right}>
-        {isLoggedIn && (
-          <>
-            <Link to="/my-applications" style={styles.link}>我的申请</Link>
-            <Link to="/publish" style={styles.btnGreen}>New OPC</Link>
-          </>
-        )}
-        {isLoggedIn ? (
-          <div style={styles.userSection}>
-            <span style={styles.username}>{user?.username}</span>
-            <button onClick={handleLogout} style={styles.logoutBtn}>登出</button>
-          </div>
-        ) : (
-          <Link to="/login" style={styles.loginBtn}>登录</Link>
-        )}
+    <nav style={s.nav}>
+      <div style={s.inner}>
+        {/* 左侧 Logo */}
+        <div style={s.left}>
+          <Link to="/" style={s.logo}>🤝 OPC 协作网络</Link>
+        </div>
+
+        {/* 右侧导航 */}
+        <div style={s.right}>
+          {isLoggedIn && (
+            <>
+              <Link to="/my-applications" style={s.link}>📋 我的申请</Link>
+              <Link to="/publish"          style={s.btnPrimary}>＋ 发布 OPC</Link>
+            </>
+          )}
+
+          {isLoggedIn ? (
+            <div style={s.userSection}>
+              <span style={s.username}>{user?.username || '用户'}</span>
+              <button onClick={handleLogout} style={s.logoutBtn}>登出</button>
+            </div>
+          ) : (
+            <Link to="/login" style={s.loginBtn}>登录</Link>
+          )}
+        </div>
       </div>
     </nav>
   );
 }
 
-const styles = {
+// -------- 样式 --------
+const s = {
   nav: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#24292f',
-    padding: '0 24px',
-    height: '56px',
+    backgroundColor: '#24292f',   // 保持 GitHub 暗色风格
     position: 'sticky',
     top: 0,
     zIndex: 100,
+    boxShadow: '0 1px 2px rgba(0,0,0,0.2)',
+  },
+  inner: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: `0 ${space.md}px`,
+    height: '56px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   left: {
     display: 'flex',
     alignItems: 'center',
   },
   logo: {
-    color: '#ffffff',
-    fontSize: '18px',
-    fontWeight: '600',
+    color: '#fff',
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
     textDecoration: 'none',
-    letterSpacing: '-0.5px',
+    letterSpacing: '-0.3px',
+    whiteSpace: 'nowrap',
   },
   right: {
     display: 'flex',
     alignItems: 'center',
-    gap: '12px',
+    gap: space.md,
   },
   link: {
-    color: '#ffffff',
-    fontSize: '14px',
-    fontWeight: '500',
+    color: 'rgba(255,255,255,0.85)',
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
     textDecoration: 'none',
-    padding: '5px 12px',
+    padding: `${space.xs}px ${space.sm}px`,
     borderRadius: '6px',
-    transition: 'background-color 0.2s',
+    transition: 'background-color 0.15s, color 0.15s',
   },
-  btnGreen: {
-    backgroundColor: '#2ea44f',
-    color: '#ffffff',
-    padding: '5px 16px',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: '600',
+  btnPrimary: {
+    backgroundColor: color.primary,
+    color: '#fff',
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.semibold,
     textDecoration: 'none',
-    border: '1px solid rgba(27,31,36,0.15)',
-    boxShadow: '0 1px 0 rgba(27,31,36,0.1)',
-    transition: 'background-color 0.2s',
-  },
-  loginBtn: {
-    color: '#ffffff',
-    fontSize: '14px',
-    fontWeight: '500',
-    textDecoration: 'none',
-    padding: '5px 12px',
+    padding: `${space.xs}px ${space.md}px`,
     borderRadius: '6px',
-    border: '1px solid rgba(255,255,255,0.3)',
-    transition: 'background-color 0.2s',
+    transition: 'background-color 0.15s',
+    whiteSpace: 'nowrap',
   },
   userSection: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
+    gap: space.sm,
   },
   username: {
-    color: '#ffffff',
-    fontSize: '14px',
-    fontWeight: '500',
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
   },
   logoutBtn: {
-    padding: '4px 12px',
-    fontSize: '13px',
+    backgroundColor: 'rgba(255,255,255,0.1)',
     color: '#fff',
-    backgroundColor: 'transparent',
-    border: '1px solid rgba(255,255,255,0.3)',
+    border: '1px solid rgba(255,255,255,0.2)',
     borderRadius: '6px',
+    padding: `${space.xs}px ${space.sm}px`,
+    fontSize: fontSize.xs,
     cursor: 'pointer',
+    transition: 'background-color 0.15s',
+  },
+  loginBtn: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: fontSize.sm,
+    fontWeight: fontWeight.medium,
+    textDecoration: 'none',
+    padding: `${space.xs}px ${space.sm}px`,
+    borderRadius: '6px',
+    border: '1px solid rgba(255,255,255,0.25)',
+    transition: 'background-color 0.15s',
   },
 };

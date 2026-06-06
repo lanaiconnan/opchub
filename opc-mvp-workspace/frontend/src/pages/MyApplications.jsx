@@ -1,93 +1,66 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import StatusMessage from '../components/StatusMessage';
+import api from '../utils/api';
+import { color, space, radius, fontSize, fontWeight, shadow, containerStyle } from '../styles/tokens';
+
+const STATUS_MAP = {
+  pending:   { label: '待处理',   bg: '#fff3cd', color: '#856404' },
+  accepted:  { label: '已接受',   bg: '#d4edda', color: '#155724' },
+  rejected:  { label: '已拒绝',   bg: '#f8d7da', color: '#721c24' },
+};
 
 function MyApplications() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('received'); // received | sent
+  const [activeTab, setActiveTab] = useState('received');
   const [applications, setApplications] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  const API = '/opc';
 
   const fetchApplications = useCallback(async () => {
     setLoading(true);
     setError('');
     setApplications([]);
-
-    const token = localStorage.getItem('token');
-    if (!token) {
-      setError('请先登录');
-      setLoading(false);
-      return;
-    }
-
     try {
-      const url =
-        activeTab === 'received'
-          ? `${API}/my-applications/received`
-          : `${API}/my-applications/sent`;
-
-      const res = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.data.success) {
-        setApplications(res.data.applications || res.data.applications);
-      } else {
-        setError(res.data.error || '获取申请失败');
-      }
+      const url = activeTab === 'received'
+        ? '/opc/my-applications/received'
+        : '/opc/my-applications/sent';
+      const res = await api.get(url);
+      setApplications(res.data.applications || []);
     } catch (err) {
-      setError('网络错误：' + (err.response?.data?.error || err.message));
+      setError(err.response?.data?.error || '网络错误');
     } finally {
       setLoading(false);
     }
   }, [activeTab]);
 
-  useEffect(() => {
-    fetchApplications();
-  }, [fetchApplications]);
+  useEffect(() => { fetchApplications(); }, [fetchApplications]);
 
   const handleUpdateStatus = async (appId, status) => {
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.put(
-        `${API}/application/${appId}`,
-        { status },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (res.data.success) {
-        fetchApplications();
-      } else {
-        alert(res.data.error || '操作失败');
-      }
+      const res = await api.put(`/opc/application/${appId}`, { status });
+      if (res.data.success) fetchApplications();
+      else alert(res.data.error || '操作失败');
     } catch (err) {
       alert('网络错误：' + (err.response?.data?.error || err.message));
     }
   };
 
-  const statusMap = {
-    pending: { label: '待处理', bg: '#fff3cd', color: '#856404' },
-    accepted: { label: '已接受', bg: '#d4edda', color: '#155724' },
-    rejected: { label: '已拒绝', bg: '#f8d7da', color: '#721c24' },
-  };
-
   return (
-    <div style={styles.container}>
-      <h2 style={styles.title}>📋 我的申请</h2>
+    <div style={{ ...containerStyle, paddingTop: space.xl, paddingBottom: space.xl }}>
+      <h2 style={s.title}>📋 我的申请</h2>
 
       {/* Tab 切换 */}
-      <div style={styles.tabs}>
+      <div style={s.tabs}>
         {['received', 'sent'].map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             style={{
-              ...styles.tabBtn,
-              backgroundColor: activeTab === tab ? '#2ea44f' : '#fff',
-              color: activeTab === tab ? '#fff' : '#1F2328',
-              borderColor: activeTab === tab ? '#2ea44f' : '#d0d7de',
+              ...s.tabBtn,
+              backgroundColor: activeTab === tab ? color.primary : color.surface,
+              color:         activeTab === tab ? '#fff' : color.textPrimary,
+              borderColor:  activeTab === tab ? color.primary : color.border,
             }}
           >
             {tab === 'received' ? '📥 收到的申请' : '📤 我发起的申请'}
@@ -95,68 +68,52 @@ function MyApplications() {
         ))}
       </div>
 
-      {error ? (
-        <div style={styles.errorBox}>⚠️ {error}</div>
-      ) : null}
+      {error && (
+        <div style={s.errorBox}>⚠️ {error}</div>
+      )}
 
-      {loading ? (
-        <div style={styles.loading}>
-          <span style={{ fontSize: 24, marginBottom: 8 }}>⏳</span>
-          加载中...
-        </div>
-      ) : applications.length === 0 ? (
-        <div style={styles.empty}>
-          {activeTab === 'received' ? '还没有人申请你的 OPC' : '你还没有发起过申请'}
-        </div>
-      ) : (
-        <div>
+      {loading && <StatusMessage variant="loading" />}
+
+      {!loading && !error && applications.length === 0 && (
+        <StatusMessage
+          variant="empty"
+          title={activeTab === 'received' ? '还没有人申请你的 OPC' : '你还没有发起过申请'}
+        />
+      )}
+
+      {!loading && !error && applications.length > 0 && (
+        <div style={s.list}>
           {applications.map(app => {
-            const s = statusMap[app.status] || statusMap.pending;
+            const s = STATUS_MAP[app.status] || STATUS_MAP.pending;
             return (
-              <div key={app.id} style={styles.card}>
-                <div style={styles.cardBody}>
-                  <h4 style={styles.cardTitle}>
+              <div key={app.id} style={s.card}>
+                <div style={s.cardBody}>
+                  <h4 style={s.cardTitle}>
                     🔥 {app.opcName || `OPC #${app.opcId}`}
                   </h4>
-                  <p style={styles.cardMeta}>
+                  <p style={s.cardMeta}>
                     {activeTab === 'received' ? (
-                      <>
-                        申请人：<b>{app.applicantName}</b>（{app.applicantContact}）
-                      </>
+                      <>申请人：<b>{app.applicantName}</b>（{app.applicantContact}）</>
                     ) : (
-                      <>
-                        联系：<b>{app.opcContact}</b>
-                      </>
+                      <>联系方式：<b>{app.opcContact}</b></>
                     )}
                   </p>
                   {app.message && (
-                    <p style={styles.cardMsg}>"{app.message}"</p>
+                    <p style={s.cardMsg}>"{app.message}"</p>
                   )}
-                  <p style={styles.cardTime}>
-                    {new Date(app.createdAt).toLocaleString()}
+                  <p style={s.cardTime}>
+                    {app.createdAt ? new Date(app.createdAt).toLocaleString() : '时间未知'}
                   </p>
                 </div>
 
-                <div style={styles.cardRight}>
-                  <span style={{ ...styles.statusBadge, backgroundColor: s.bg, color: s.color }}>
+                <div style={s.cardRight}>
+                  <span style={{ ...s.statusBadge, backgroundColor: s.bg, color: s.color }}>
                     {s.label}
                   </span>
-
-                  {/* 只有收到的申请才能操作 */}
                   {activeTab === 'received' && app.status === 'pending' && (
-                    <div style={styles.actionBtns}>
-                      <button
-                        onClick={() => handleUpdateStatus(app.id, 'accepted')}
-                        style={styles.acceptBtn}
-                      >
-                        ✅ 接受
-                      </button>
-                      <button
-                        onClick={() => handleUpdateStatus(app.id, 'rejected')}
-                        style={styles.rejectBtn}
-                      >
-                        ❌ 拒绝
-                      </button>
+                    <div style={s.actionBtns}>
+                      <button onClick={() => handleUpdateStatus(app.id, 'accepted')} style={s.acceptBtn}>✅ 接受</button>
+                      <button onClick={() => handleUpdateStatus(app.id, 'rejected')} style={s.rejectBtn}>❌ 拒绝</button>
                     </div>
                   )}
                 </div>
@@ -169,125 +126,114 @@ function MyApplications() {
   );
 }
 
-export default MyApplications;
-
-// -------- 样式 --------
-const styles = {
-  container: {
-    maxWidth: '800px',
-    margin: '0 auto',
-    padding: '40px 20px',
-  },
+const s = {
   title: {
-    fontSize: '24px',
-    fontWeight: '600',
-    color: '#1F2328',
-    marginBottom: '24px',
+    fontSize: fontSize.xxl,
+    fontWeight: fontWeight.semibold,
+    color: color.textPrimary,
+    marginBottom: space.lg,
   },
   tabs: {
     display: 'flex',
-    gap: '8px',
-    marginBottom: '24px',
+    gap: space.sm,
+    marginBottom: space.xl,
   },
   tabBtn: {
-    padding: '8px 16px',
-    borderRadius: '6px',
-    fontSize: '14px',
-    fontWeight: '500',
-    border: '1px solid',
+    padding: `${space.sm}px ${space.lg}px`,
+    borderRadius: radius.md,
+    fontSize: fontSize.base,
+    fontWeight: fontWeight.medium,
+    border: `1px solid ${color.border}`,
     cursor: 'pointer',
+    transition: 'all 0.15s',
   },
   errorBox: {
-    color: '#721c24',
-    padding: '12px 16px',
-    backgroundColor: '#f8d7da',
-    border: '1px solid #f5c6cb',
-    borderRadius: '6px',
-    marginBottom: '16px',
+    color: color.danger,
+    backgroundColor: color.dangerLight,
+    border: `1px solid ${color.danger}`,
+    borderRadius: radius.md,
+    padding: space.md,
+    marginBottom: space.lg,
+    fontSize: fontSize.base,
   },
-  loading: {
-    textAlign: 'center',
-    padding: '40px',
-    color: '#656d76',
+  list: {
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
-  },
-  empty: {
-    textAlign: 'center',
-    padding: '40px',
-    color: '#656d76',
-    border: '1px dashed #d0d7de',
-    borderRadius: '8px',
+    gap: space.md,
   },
   card: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '16px 20px',
-    border: '1px solid #d0d7de',
-    borderRadius: '8px',
-    marginBottom: '12px',
-    backgroundColor: '#fff',
+    padding: space.lg,
+    border: `1px solid ${color.border}`,
+    borderRadius: radius.lg,
+    backgroundColor: color.surface,
+    boxShadow: shadow.card,
+    transition: 'box-shadow 0.2s',
   },
   cardBody: {
     flex: 1,
+    minWidth: 0,
   },
   cardTitle: {
-    fontSize: '16px',
-    fontWeight: '600',
-    color: '#1F2328',
-    marginBottom: '6px',
+    fontSize: fontSize.lg,
+    fontWeight: fontWeight.semibold,
+    color: color.textPrimary,
+    marginBottom: space.xs,
   },
   cardMeta: {
-    fontSize: '13px',
-    color: '#656d76',
-    marginBottom: '4px',
+    fontSize: fontSize.sm,
+    color: color.textSecondary,
+    marginBottom: space.xs,
   },
   cardMsg: {
-    fontSize: '13px',
-    color: '#1F2328',
+    fontSize: fontSize.sm,
+    color: color.textPrimary,
     fontStyle: 'italic',
-    marginBottom: '4px',
+    marginBottom: space.xs,
   },
   cardTime: {
-    fontSize: '12px',
-    color: '#8b949e',
+    fontSize: fontSize.xs,
+    color: color.textMuted,
   },
   cardRight: {
     minWidth: '120px',
     textAlign: 'right',
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    gap: space.sm,
     alignItems: 'flex-end',
+    marginLeft: space.lg,
   },
   statusBadge: {
-    padding: '2px 8px',
-    borderRadius: '12px',
-    fontSize: '12px',
-    fontWeight: '500',
+    padding: `${space.xs}px ${space.sm}px`,
+    borderRadius: radius.full,
+    fontSize: fontSize.xs,
+    fontWeight: fontWeight.medium,
   },
   actionBtns: {
     display: 'flex',
-    gap: '6px',
+    gap: space.xs,
   },
   acceptBtn: {
-    backgroundColor: '#2ea44f',
+    backgroundColor: color.primary,
     color: '#fff',
     border: 'none',
-    borderRadius: '6px',
-    padding: '4px 10px',
-    fontSize: '12px',
+    borderRadius: radius.md,
+    padding: `${space.xs}px ${space.sm}px`,
+    fontSize: fontSize.xs,
     cursor: 'pointer',
   },
   rejectBtn: {
-    backgroundColor: '#da3633',
+    backgroundColor: color.danger,
     color: '#fff',
     border: 'none',
-    borderRadius: '6px',
-    padding: '4px 10px',
-    fontSize: '12px',
+    borderRadius: radius.md,
+    padding: `${space.xs}px ${space.sm}px`,
+    fontSize: fontSize.xs,
     cursor: 'pointer',
   },
 };
+
+export default MyApplications;
