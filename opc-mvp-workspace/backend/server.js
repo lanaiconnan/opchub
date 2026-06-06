@@ -260,7 +260,9 @@ app.get('/auth/me', authMiddleware, async (req, res) => {
 // GET /opc/list
 app.get('/opc/list', async (req, res) => {
   await db.read();
-  res.json(db.data.opcList);
+  // 过滤掉已下架的 OPC
+  const list = (db.data.opcList || []).filter(opc => opc.status !== 'offline');
+  res.json(list);
 });
 
 // GET /opc/detail/:id
@@ -299,12 +301,13 @@ app.post('/opc/publish', async (req, res) => {
     tags: tags || '', 
     price: price || '', 
     contact,
-    creatorId: creatorId || contact, // 优先用 userId，否则用 contact
+    creatorId: creatorId || contact,
     category: category || 'other', 
     requiredSkills: requiredSkills || [],
     collaborationType: collaborationType || 'once', 
     experienceLevel: experienceLevel || 'any',
     timeCommitment: timeCommitment || '',
+    status: 'online',
   };
   
   db.data.opcList.push(newOpc);
@@ -317,7 +320,7 @@ app.put('/opc/edit/:id', async (req, res) => {
   await db.read();
   const idx = db.data.opcList.findIndex(i => i.id === Number(req.params.id));
   if (idx === -1) return res.status(404).json({ error: 'OPC not found' });
-  const { name, description, tags, price, contact, category, requiredSkills, collaborationType, experienceLevel, timeCommitment } = req.body;
+  const { name, description, tags, price, contact, category, requiredSkills, collaborationType, experienceLevel, timeCommitment, status } = req.body;
   const old = db.data.opcList[idx];
   db.data.opcList[idx] = {
     ...old, name: name || old.name,
@@ -329,6 +332,7 @@ app.put('/opc/edit/:id', async (req, res) => {
     collaborationType: collaborationType || old.collaborationType,
     experienceLevel: experienceLevel || old.experienceLevel,
     timeCommitment: timeCommitment !== undefined ? timeCommitment : old.timeCommitment,
+    status: status !== undefined ? status : old.status,
   };
   await db.write();
   res.json({ success: true, opc: db.data.opcList[idx] });
@@ -614,6 +618,20 @@ app.get('/opc/star/:id', async (req, res) => {
 });
 
 // ==================== My Applications ====================
+
+// GET /opc/my-opcs — 获取我发布的 OPC（需登录）
+app.get('/opc/my-opcs', authMiddleware, async (req, res) => {
+  try {
+    await db.read();
+    db.data.opcList = db.data.opcList || [];
+    const userId = req.user.userId;
+    const myOpcs = db.data.opcList.filter(opc => opc.creatorId === userId);
+    res.json({ success: true, opcs: myOpcs });
+  } catch (err) {
+    console.error('Get my OPCs error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // GET /opc/my-applications/received — 获取我收到的申请（我创建的OPC的申请）
 app.get('/opc/my-applications/received', authMiddleware, async (req, res) => {
