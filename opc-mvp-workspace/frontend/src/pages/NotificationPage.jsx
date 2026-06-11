@@ -3,13 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import StatusMessage from '../components/StatusMessage';
 import ToastContext from '../context/ToastContext';
 import api from '../utils/api';
-import { color, space, radius, fontSize, fontWeight, shadow, containerStyle } from '../styles/tokens';
+import { space, radius, fontSize, fontWeight, shadow, containerStyle, useColors } from '../styles/tokens';
 
 export default function NotificationPage() {
   const [applications, setApplications] = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const { showToast }            = useContext(ToastContext);
-  const navigate                  = useNavigate();
+  const [loading, setLoading]         = useState(true);
+  const { showToast }                  = useContext(ToastContext);
+  const navigate                        = useNavigate();
+  const color                           = useColors();
 
   useEffect(() => {
     const token = localStorage.getItem('accessToken');
@@ -47,6 +48,83 @@ export default function NotificationPage() {
   const handled = applications.filter(a => a.status !== 'pending');
 
   if (loading) return <StatusMessage variant="loading" title="加载申请通知..." />;
+
+  // ------- 动态样式（依赖 color）--------
+  const s = {
+    title: {
+      fontSize: fontSize.xxl,
+      fontWeight: fontWeight.semibold,
+      color: color.textPrimary,
+      marginBottom: space.xl,
+    },
+    section: { marginBottom: space.xl },
+    sectionTitle: (c) => ({
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.semibold,
+      color: c,
+      marginBottom: space.lg,
+    }),
+    card: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: space.lg,
+      border: `1px solid ${color.border}`,
+      borderRadius: radius.lg,
+      marginBottom: space.md,
+      backgroundColor: color.surface,
+      boxShadow: shadow.card,
+      transition: 'box-shadow 0.2s',
+    },
+    cardBody: { flex: 1, minWidth: 0 },
+    cardTitle: {
+      fontSize: fontSize.lg,
+      fontWeight: fontWeight.semibold,
+      color: color.textPrimary,
+      marginBottom: space.xs,
+    },
+    cardMeta: {
+      fontSize: fontSize.sm,
+      color: color.textSecondary,
+      marginBottom: space.xs,
+    },
+    cardMsg: {
+      fontSize: fontSize.sm,
+      color: color.textPrimary,
+      fontStyle: 'italic',
+    },
+    cardActions: {
+      display: 'flex',
+      gap: space.sm,
+      marginLeft: space.lg,
+    },
+    acceptBtn: {
+      backgroundColor: color.primary,
+      color: '#fff',
+      border: 'none',
+      borderRadius: radius.md,
+      padding: `${space.xs}px ${space.sm}px`,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.medium,
+      cursor: 'pointer',
+      transition: 'background-color 0.15s',
+    },
+    rejectBtn: {
+      backgroundColor: color.danger,
+      color: '#fff',
+      border: 'none',
+      borderRadius: radius.md,
+      padding: `${space.xs}px ${space.sm}px`,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.medium,
+      cursor: 'pointer',
+      transition: 'background-color 0.15s',
+    },
+    statusBadge: (status) => ({
+      fontWeight: fontWeight.medium,
+      color: status === 'accepted' ? color.primary : color.danger,
+    }),
+  };
 
   return (
     <div style={{ ...containerStyle, paddingTop: space.xl, paddingBottom: space.xl }}>
@@ -92,84 +170,3 @@ export default function NotificationPage() {
     </div>
   );
 }
-
-const s = {
-  title: {
-    fontSize: fontSize.xxl,
-    fontWeight: fontWeight.semibold,
-    color: color.textPrimary,
-    marginBottom: space.xl,
-  },
-  section: {
-    marginBottom: space.xl,
-  },
-  sectionTitle: (c) => ({
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.semibold,
-    color: c,
-    marginBottom: space.lg,
-  }),
-  card: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: space.lg,
-    border: `1px solid ${color.border}`,
-    borderRadius: radius.lg,
-    marginBottom: space.md,
-    backgroundColor: color.surface,
-    boxShadow: shadow.card,
-    transition: 'box-shadow 0.2s',
-  },
-  cardBody: {
-    flex: 1,
-    minWidth: 0,
-  },
-  cardTitle: {
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.semibold,
-    color: color.textPrimary,
-    marginBottom: space.xs,
-  },
-  cardMeta: {
-    fontSize: fontSize.sm,
-    color: color.textSecondary,
-    marginBottom: space.xs,
-  },
-  cardMsg: {
-    fontSize: fontSize.sm,
-    color: color.textPrimary,
-    fontStyle: 'italic',
-  },
-  cardActions: {
-    display: 'flex',
-    gap: space.sm,
-    marginLeft: space.lg,
-  },
-  acceptBtn: {
-    backgroundColor: color.primary,
-    color: '#fff',
-    border: 'none',
-    borderRadius: radius.md,
-    padding: `${space.xs}px ${space.sm}px`,
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.medium,
-    cursor: 'pointer',
-    transition: 'background-color 0.15s',
-  },
-  rejectBtn: {
-    backgroundColor: color.danger,
-    color: '#fff',
-    border: 'none',
-    borderRadius: radius.md,
-    padding: `${space.xs}px ${space.sm}px`,
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.medium,
-    cursor: 'pointer',
-    transition: 'background-color 0.15s',
-  },
-  statusBadge: (status) => ({
-    fontWeight: fontWeight.medium,
-    color: status === 'accepted' ? color.primary : color.danger,
-  }),
-};

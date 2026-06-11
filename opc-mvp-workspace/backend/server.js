@@ -156,15 +156,15 @@ app.post('/auth/register', async (req, res) => {
     };
     
     db.data.users.push(user);
-    await db.write();
     
     // 生成 tokens
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
     
-    // 保存 refresh token
-    user.refreshTokens = user.refreshTokens || [];
-    user.refreshTokens.push(refreshToken);
+    // 保存 refresh token（通过 db.data 路径确保 Proxy 追踪）
+    const rIdx = db.data.users.findIndex(u => u.id === user.id);
+    db.data.users[rIdx].refreshTokens = db.data.users[rIdx].refreshTokens || [];
+    db.data.users[rIdx].refreshTokens.push(refreshToken);
     await db.write();
     
     res.json({
@@ -211,9 +211,10 @@ app.post('/auth/login', async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
     
-    // 保存 refresh token
-    user.refreshTokens = user.refreshTokens || [];
-    user.refreshTokens.push(refreshToken);
+    // 保存 refresh token（通过 db.data 路径确保 Proxy 追踪）
+    const lIdx = db.data.users.findIndex(u => u.id === user.id);
+    db.data.users[lIdx].refreshTokens = db.data.users[lIdx].refreshTokens || [];
+    db.data.users[lIdx].refreshTokens.push(refreshToken);
     await db.write();
     
     res.json({
@@ -558,8 +559,10 @@ app.post('/auth/refresh', async (req, res) => {
     
     // Refresh token rotation: 生成新的 refresh token，替换旧的
     const newRefreshToken = generateRefreshToken(user);
-    user.refreshTokens = user.refreshTokens.filter(t => t !== refreshToken);
-    user.refreshTokens.push(newRefreshToken);
+    // 直接通过 db.data 路径修改，确保 Proxy 能追踪变化
+    const userIdx = db.data.users.findIndex(u => u.id === decoded.userId);
+    db.data.users[userIdx].refreshTokens = db.data.users[userIdx].refreshTokens.filter(t => t !== refreshToken);
+    db.data.users[userIdx].refreshTokens.push(newRefreshToken);
     await db.write();
     
     res.json({
@@ -592,7 +595,8 @@ app.post('/auth/logout', async (req, res) => {
     db.data.users = db.data.users || [];
     const user = db.data.users.find(u => u.id === decoded.userId);
     if (user && user.refreshTokens) {
-      user.refreshTokens = user.refreshTokens.filter(t => t !== refreshToken);
+      const userIdx = db.data.users.findIndex(u => u.id === decoded.userId);
+      db.data.users[userIdx].refreshTokens = db.data.users[userIdx].refreshTokens.filter(t => t !== refreshToken);
       await db.write();
     }
     

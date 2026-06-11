@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { color, space, radius, fontSize, fontWeight, shadow } from '../styles/tokens';
+import { space, radius, fontSize, fontWeight, shadow, useColors } from '../styles/tokens';
 
 // 密码强度校验（与后端一致）
 function validatePassword(pwd) {
@@ -14,15 +14,16 @@ function validatePassword(pwd) {
 }
 
 function Register() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [username, setUsername]         = useState('');
+  const [password, setPassword]         = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [email, setEmail] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [email, setEmail]               = useState('');
+  const [error, setError]               = useState('');
+  const [loading, setLoading]           = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname || '/';
+  const color = useColors();
 
   const pwdCheck = validatePassword(password);
   const pwdTouched = password.length > 0;
@@ -57,6 +58,102 @@ function Register() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const s = {
+    page: {
+      minHeight: 'calc(100vh - 56px)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: color.bg,
+      padding: `${space.md}px`,
+    },
+    card: {
+      backgroundColor: color.surface,
+      padding: `${space.xl}px`,
+      borderRadius: radius.lg,
+      boxShadow: shadow.card,
+      width: '100%',
+      maxWidth: '420px',
+    },
+    title: {
+      margin: `0 0 ${space.xl}px 0`,
+      textAlign: 'center',
+      fontSize: fontSize.xxl,
+      fontWeight: fontWeight.semibold,
+      color: color.textPrimary,
+    },
+    field: { marginBottom: space.lg },
+    label: {
+      display: 'block',
+      marginBottom: space.xs,
+      fontSize: fontSize.sm,
+      fontWeight: fontWeight.medium,
+      color: color.textPrimary,
+    },
+    input: {
+      width: '100%',
+      padding: `${space.xs}px ${space.sm}px`,
+      fontSize: fontSize.base,
+      border: `1px solid ${color.border}`,
+      borderRadius: radius.md,
+      outline: 'none',
+      boxSizing: 'border-box',
+      transition: 'border-color 0.15s',
+      backgroundColor: color.surface,
+      color: color.textPrimary,
+    },
+    pwdStrength: {
+      marginBottom: space.lg,
+      fontSize: fontSize.xs,
+      lineHeight: 1.8,
+    },
+    strengthBar: {
+      height: '4px',
+      backgroundColor: color.gray2,
+      borderRadius: radius.full,
+      marginTop: space.xs,
+      overflow: 'hidden',
+    },
+    strengthFill: {
+      height: '100%',
+      borderRadius: radius.full,
+      transition: 'width 0.3s, background-color 0.3s',
+    },
+    btn: {
+      width: '100%',
+      padding: `${space.sm}px ${space.lg}px`,
+      fontSize: fontSize.base,
+      fontWeight: fontWeight.semibold,
+      color: '#fff',
+      backgroundColor: color.primary,
+      border: 'none',
+      borderRadius: radius.md,
+      cursor: 'pointer',
+      marginTop: space.xs,
+      transition: 'background-color 0.15s',
+    },
+    error: {
+      padding: space.sm,
+      marginBottom: space.lg,
+      backgroundColor: color.dangerLight,
+      border: `1px solid ${color.danger}`,
+      borderRadius: radius.md,
+      color: color.danger,
+      fontSize: fontSize.sm,
+    },
+    footer: {
+      marginTop: space.xl,
+      textAlign: 'center',
+      fontSize: fontSize.sm,
+      color: color.textSecondary,
+    },
+    link: {
+      color: color.info,
+      textDecoration: 'none',
+      fontWeight: fontWeight.medium,
+    },
   };
 
   return (
@@ -141,101 +238,5 @@ function Register() {
     </div>
   );
 }
-
-const s = {
-  page: {
-    minHeight: 'calc(100vh - 56px)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: color.bg,
-    padding: `${space.md}px`,
-  },
-  card: {
-    backgroundColor: color.surface,
-    padding: `${space.xl}px`,
-    borderRadius: radius.lg,
-    boxShadow: shadow.card,
-    width: '100%',
-    maxWidth: '420px',
-  },
-  title: {
-    margin: `0 0 ${space.xl}px 0`,
-    textAlign: 'center',
-    fontSize: fontSize.xxl,
-    fontWeight: fontWeight.semibold,
-    color: color.textPrimary,
-  },
-  field: {
-    marginBottom: space.lg,
-  },
-  label: {
-    display: 'block',
-    marginBottom: space.xs,
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.medium,
-    color: color.textPrimary,
-  },
-  input: {
-    width: '100%',
-    padding: `${space.xs}px ${space.sm}px`,
-    fontSize: fontSize.base,
-    border: `1px solid ${color.border}`,
-    borderRadius: radius.md,
-    outline: 'none',
-    boxSizing: 'border-box',
-    transition: 'border-color 0.15s',
-  },
-  pwdStrength: {
-    marginBottom: space.lg,
-    fontSize: fontSize.xs,
-    lineHeight: 1.8,
-  },
-  strengthBar: {
-    height: '4px',
-    backgroundColor: color.gray2,
-    borderRadius: radius.full,
-    marginTop: space.xs,
-    overflow: 'hidden',
-  },
-  strengthFill: {
-    height: '100%',
-    borderRadius: radius.full,
-    transition: 'width 0.3s, background-color 0.3s',
-  },
-  btn: {
-    width: '100%',
-    padding: `${space.sm}px ${space.lg}px`,
-    fontSize: fontSize.base,
-    fontWeight: fontWeight.semibold,
-    color: '#fff',
-    backgroundColor: color.primary,
-    border: 'none',
-    borderRadius: radius.md,
-    cursor: 'pointer',
-    marginTop: space.xs,
-    transition: 'background-color 0.15s',
-  },
-  error: {
-    padding: space.sm,
-    marginBottom: space.lg,
-    backgroundColor: color.dangerLight,
-    border: `1px solid ${color.danger}`,
-    borderRadius: radius.md,
-    color: color.danger,
-    fontSize: fontSize.sm,
-  },
-  footer: {
-    marginTop: space.xl,
-    textAlign: 'center',
-    fontSize: fontSize.sm,
-    color: color.textSecondary,
-  },
-  link: {
-    color: color.info,
-    textDecoration: 'none',
-    fontWeight: fontWeight.medium,
-  },
-};
 
 export default Register;

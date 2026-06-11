@@ -4,9 +4,9 @@ import ChatInput from '../components/ChatInput';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import StatusMessage from '../components/StatusMessage';
 import api from '../utils/api';
-import { color, space, radius, fontSize, fontWeight, shadow, containerStyle } from '../styles/tokens';
+import { space, radius, fontSize, fontWeight, shadow, containerStyle, useColors } from '../styles/tokens';
 
-// -------- 常量映射 --------
+// ------- 常量映射 -------
 const CATEGORY_MAP = {
   web:    { icon: '🌐', label: 'Web 开发' },
   mobile: { icon: '📱', label: '移动开发' },
@@ -18,29 +18,77 @@ const CATEGORY_MAP = {
 const COLLAB_MAP = { once: '一次性协作', longterm: '长期合作', research: '研究项目' };
 const EXP_MAP    = { beginner: '🌱 初学者友好', intermediate: '💡 需要经验', expert: '🏆 专家级', any: '不限' };
 
-// -------- 申请弹窗 --------
+// ------- 申请弹窗（独立组件，内部使用 useColors）-------
 function ApplyModal({ opc, onClose, onSubmit, loading }) {
   const [message, setMessage] = useState('');
+  const color = useColors();
 
   const handleSubmit = () => {
     if (!message.trim()) return;
     onSubmit(message);
   };
 
+  const s = {
+    overlay: {
+      position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 1000,
+    },
+    modal: {
+      backgroundColor: color.surface,
+      borderRadius: radius.xl,
+      padding: space.xl,
+      width: '90%', maxWidth: '480px',
+      maxHeight: '90vh', overflowY: 'auto',
+      boxShadow: shadow.modal,
+    },
+    title: {
+      fontSize: fontSize.xxl, fontWeight: fontWeight.semibold,
+      color: color.textPrimary, marginBottom: space.lg,
+    },
+    desc: {
+      fontSize: fontSize.base, color: color.textSecondary, marginBottom: space.xl,
+    },
+    textarea: {
+      width: '100%', padding: space.sm,
+      fontSize: fontSize.base, border: `1px solid ${color.border}`,
+      borderRadius: radius.md, outline: 'none',
+      fontFamily: 'inherit', resize: 'vertical',
+      minHeight: '120px', boxSizing: 'border-box',
+      backgroundColor: color.surface, color: color.textPrimary,
+    },
+    actions: {
+      display: 'flex', justifyContent: 'flex-end', gap: space.sm, marginTop: space.xl,
+    },
+    btnCancel: {
+      backgroundColor: color.gray1, color: color.textPrimary,
+      padding: `${space.sm}px ${space.lg}px`, borderRadius: radius.md,
+      fontSize: fontSize.base, fontWeight: fontWeight.medium,
+      border: `1px solid ${color.border}`, cursor: 'pointer',
+    },
+    btnSubmit: {
+      backgroundColor: color.primary, color: '#fff',
+      padding: `${space.sm}px ${space.lg}px`, borderRadius: radius.md,
+      fontSize: fontSize.base, fontWeight: fontWeight.semibold,
+      border: 'none', cursor: 'pointer',
+    },
+  };
+
   return (
-    <div style={s.modalOverlay} onClick={onClose}>
+    <div style={s.overlay} onClick={onClose}>
       <div style={s.modal} onClick={e => e.stopPropagation()}>
-        <h3 style={s.modalTitle}>申请「{opc.name}」</h3>
-        <p style={s.modalDesc}>向发布者说明你的技能、经验和合作意向</p>
+        <h3 style={s.title}>申请「{opc.name}」</h3>
+        <p style={s.desc}>向发布者说明你的技能、经验和合作意向</p>
         <textarea
-          style={s.modalTextarea}
+          style={s.textarea}
           placeholder="例如：我是前端开发，熟悉 React 和 TypeScript，对您的项目很感兴趣..."
           value={message}
           onChange={e => setMessage(e.target.value)}
           rows={6}
           autoFocus
         />
-        <div style={s.modalActions}>
+        <div style={s.actions}>
           <button onClick={onClose} style={s.btnCancel} disabled={loading}>取消</button>
           <button onClick={handleSubmit} style={s.btnSubmit} disabled={loading || !message.trim()}>
             {loading ? '提交中...' : '提交申请'}
@@ -51,7 +99,7 @@ function ApplyModal({ opc, onClose, onSubmit, loading }) {
   );
 }
 
-// -------- 主页面 --------
+// ------- 主页面 -------
 function ChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -65,6 +113,7 @@ function ChatPage() {
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [applyLoading, setApplyLoading] = useState(false);
   const messagesEndRef = useRef(null);
+  const color = useColors();
 
   // 获取 OPC 详情
   useEffect(() => {
@@ -77,8 +126,7 @@ function ChatPage() {
           content: `你好！我是 **${res.data.name}** 的 AI 协作助手 🤖\n\n## 我能帮你什么？\n\n- **生成沟通文案** — 帮你写专业的合作提案\n- **匹配建议** — 根据你的技能推荐协作方向\n- **合作方案** — 制定清晰的任务分工\n\n> 告诉我你的技能或合作意向，我会给出具体建议。`,
         }]);
       })
-      .catch(() => { alert('OPC 不存在'); navigate('/'); });
-
+      .catch(() => { alert('项目不存在'); navigate('/'); });
     api.get(`/opc/star/${id}`).then(r => setStarCount(r.data.count || 0)).catch(() => {});
     const token = localStorage.getItem('accessToken');
     if (token) {
@@ -134,9 +182,129 @@ function ChatPage() {
   };
 
   if (loading) return <StatusMessage variant="loading" />;
-  if (!opc) return <StatusMessage variant="error" title="OPC 不存在" />;
+  if (!opc) return <StatusMessage variant="error" title="项目不存在" />;
 
   const cat = CATEGORY_MAP[opc.category] || CATEGORY_MAP.other;
+
+  // ------- 动态样式（依赖 color）-------
+  const s = {
+    page: {
+      ...containerStyle,
+      display: 'flex', flexDirection: 'column',
+      minHeight: 'calc(100vh - 56px)',
+      padding: `${space.md}px`,
+    },
+    // 顶栏
+    topBar: {
+      display: 'flex', alignItems: 'center',
+      gap: space.md,
+      padding: `${space.sm}px ${space.md}px`,
+      backgroundColor: color.surface,
+      border: `1px solid ${color.border}`,
+      borderRadius: radius.lg,
+      marginBottom: space.md,
+    },
+    backBtn: {
+      backgroundColor: 'transparent',
+      border: `1px solid ${color.border}`,
+      borderRadius: radius.md,
+      padding: `${space.xs}px ${space.sm}px`,
+      cursor: 'pointer', fontSize: fontSize.sm,
+      color: color.textPrimary, whiteSpace: 'nowrap',
+    },
+    topInfo: {
+      flex: 1, display: 'flex', alignItems: 'center',
+      gap: space.sm, minWidth: 0,
+    },
+    topCatIcon: { fontSize: '18px', flexShrink: 0 },
+    topTitle: {
+      fontSize: fontSize.base, fontWeight: fontWeight.semibold,
+      color: color.textPrimary,
+      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    },
+    topSub: { fontSize: fontSize.xs, color: color.textMuted, flexShrink: 0 },
+    starBtn: {
+      backgroundColor: 'transparent',
+      border: `1px solid ${color.border}`,
+      borderRadius: radius.md,
+      padding: `${space.xs}px ${space.sm}px`,
+      cursor: 'pointer', fontSize: fontSize.sm,
+      color: color.textPrimary, flexShrink: 0,
+    },
+    // OPC 详情
+    opcDetails: { marginBottom: space.md },
+    detailsToggle: {
+      cursor: 'pointer', fontSize: fontSize.sm,
+      color: color.info, padding: `${space.xs}px 0`,
+      userSelect: 'none',
+    },
+    opcCard: {
+      backgroundColor: color.gray1,
+      border: `1px solid ${color.border}`,
+      borderRadius: radius.lg,
+      padding: space.lg, marginTop: space.xs,
+    },
+    opcDesc: {
+      color: color.textSecondary, fontSize: fontSize.base,
+      marginBottom: space.md, lineHeight: 1.6,
+    },
+    opcGrid: {
+      display: 'grid', gridTemplateColumns: '1fr 1fr',
+      gap: space.sm, marginBottom: space.md,
+    },
+    opcField: { display: 'flex', gap: space.xs, fontSize: fontSize.sm },
+    fieldLabel: { color: color.textMuted, fontWeight: fontWeight.medium },
+    fieldValue: { color: color.textPrimary },
+    skillsSection: { marginBottom: space.md },
+    skillsList: { display: 'flex', flexWrap: 'wrap', gap: space.xs, marginTop: space.xs },
+    skillTag: {
+      backgroundColor: color.infoLight, color: color.info,
+      padding: `${space.xs}px ${space.xs}px`,
+      borderRadius: radius.full, fontSize: fontSize.xs, fontWeight: fontWeight.medium,
+    },
+    opcFooter: {
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      paddingTop: space.md, borderTop: `1px solid ${color.border}`,
+    },
+    applyBtn: {
+      backgroundColor: color.primary, color: '#fff',
+      border: 'none', borderRadius: radius.md,
+      padding: `${space.sm}px ${space.lg}px`,
+      cursor: 'pointer', fontSize: fontSize.base, fontWeight: fontWeight.medium,
+    },
+    contactInfo: { fontSize: fontSize.sm, color: color.textSecondary },
+    // 对话区域
+    chatArea: {
+      flex: 1, overflowY: 'auto',
+      display: 'flex', flexDirection: 'column',
+      gap: space.md, padding: `${space.sm}px 0`,
+    },
+    msgRow: (role) => ({
+      display: 'flex', alignItems: 'flex-start',
+      gap: space.sm,
+      justifyContent: role === 'user' ? 'flex-end' : 'flex-start',
+      maxWidth: '80%',
+      alignSelf: role === 'user' ? 'flex-end' : 'flex-start',
+    }),
+    avatar: { fontSize: '20px', flexShrink: 0, marginTop: '4px' },
+    avatarUser: { fontSize: '20px', flexShrink: 0, marginTop: '4px' },
+    bubble: (role) => ({
+      padding: `${space.sm}px ${space.md}px`,
+      borderRadius: role === 'user'
+        ? `${radius.xl}px ${radius.xl}px ${space.xs}px ${radius.xl}px`
+        : `${space.xs}px ${radius.xl}px ${radius.xl}px ${radius.xl}px`,
+      fontSize: fontSize.base, lineHeight: 1.6,
+      maxWidth: '100%', overflowWrap: 'break-word',
+      ...(role === 'user'
+        ? { backgroundColor: color.primary, color: '#fff' }
+        : { backgroundColor: color.gray1, color: color.textPrimary, border: `1px solid ${color.border}` }
+      ),
+    }),
+    inputArea: {
+      borderTop: `1px solid ${color.border}`,
+      paddingTop: space.md, marginTop: space.sm,
+    },
+  };
 
   return (
     <div style={s.page}>
@@ -169,7 +337,7 @@ function ChatPage() {
           {opc.requiredSkills?.length > 0 && (
             <div style={s.skillsSection}>
               <span style={s.fieldLabel}>所需技能：</span>
-              <span style={s.skillsList}>{opc.requiredSkills.map(s => <span key={s} style={s.skillTag}>{s}</span>)}</span>
+              <span style={s.skillsList}>{opc.requiredSkills.map(sk => <span key={sk} style={s.skillTag}>{sk}</span>)}</span>
             </div>
           )}
           <div style={s.opcFooter}>
@@ -207,253 +375,3 @@ function ChatPage() {
 }
 
 export default ChatPage;
-
-// -------- 样式 --------
-const s = {
-  page: {
-    ...containerStyle,
-    display: 'flex',
-    flexDirection: 'column',
-    minHeight: 'calc(100vh - 56px)',
-    padding: `${space.md}px`,
-  },
-  // 顶栏
-  topBar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: space.md,
-    padding: `${space.sm}px ${space.md}px`,
-    backgroundColor: color.surface,
-    border: `1px solid ${color.border}`,
-    borderRadius: radius.lg,
-    marginBottom: space.md,
-  },
-  backBtn: {
-    backgroundColor: 'transparent',
-    border: `1px solid ${color.border}`,
-    borderRadius: radius.md,
-    padding: `${space.xs}px ${space.sm}px`,
-    cursor: 'pointer',
-    fontSize: fontSize.sm,
-    color: color.textPrimary,
-    whiteSpace: 'nowrap',
-  },
-  topInfo: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    gap: space.sm,
-    minWidth: 0,
-  },
-  topCatIcon: { fontSize: '18px', flexShrink: 0 },
-  topTitle: {
-    fontSize: fontSize.base,
-    fontWeight: fontWeight.semibold,
-    color: color.textPrimary,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  topSub: {
-    fontSize: fontSize.xs,
-    color: color.textMuted,
-    flexShrink: 0,
-  },
-  starBtn: {
-    backgroundColor: 'transparent',
-    border: `1px solid ${color.border}`,
-    borderRadius: radius.md,
-    padding: `${space.xs}px ${space.sm}px`,
-    cursor: 'pointer',
-    fontSize: fontSize.sm,
-    color: color.textPrimary,
-    flexShrink: 0,
-  },
-  // OPC 详情
-  opcDetails: {
-    marginBottom: space.md,
-  },
-  detailsToggle: {
-    cursor: 'pointer',
-    fontSize: fontSize.sm,
-    color: color.info,
-    padding: `${space.xs}px 0`,
-    userSelect: 'none',
-  },
-  opcCard: {
-    backgroundColor: color.gray1,
-    border: `1px solid ${color.border}`,
-    borderRadius: radius.lg,
-    padding: space.lg,
-    marginTop: space.xs,
-  },
-  opcDesc: {
-    color: color.textSecondary,
-    fontSize: fontSize.base,
-    marginBottom: space.md,
-    lineHeight: 1.6,
-  },
-  opcGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: space.sm,
-    marginBottom: space.md,
-  },
-  opcField: {
-    display: 'flex',
-    gap: space.xs,
-    fontSize: fontSize.sm,
-  },
-  fieldLabel: {
-    color: color.textMuted,
-    fontWeight: fontWeight.medium,
-  },
-  fieldValue: {
-    color: color.textPrimary,
-  },
-  skillsSection: {
-    marginBottom: space.md,
-  },
-  skillsList: {
-    display: 'flex',
-    flexWrap: 'wrap',
-    gap: space.xs,
-    marginTop: space.xs,
-  },
-  skillTag: {
-    backgroundColor: color.infoLight,
-    color: color.info,
-    padding: `${space.xs}px ${space.xs}px`,
-    borderRadius: radius.full,
-    fontSize: fontSize.xs,
-    fontWeight: fontWeight.medium,
-  },
-  opcFooter: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: space.md,
-    borderTop: `1px solid ${color.border}`,
-  },
-  applyBtn: {
-    backgroundColor: color.primary,
-    color: '#fff',
-    border: 'none',
-    borderRadius: radius.md,
-    padding: `${space.sm}px ${space.lg}px`,
-    cursor: 'pointer',
-    fontSize: fontSize.base,
-    fontWeight: fontWeight.medium,
-  },
-  contactInfo: {
-    fontSize: fontSize.sm,
-    color: color.textSecondary,
-  },
-  // 对话区域
-  chatArea: {
-    flex: 1,
-    overflowY: 'auto',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: space.md,
-    padding: `${space.sm}px 0`,
-  },
-  msgRow: (role) => ({
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: space.sm,
-    justifyContent: role === 'user' ? 'flex-end' : 'flex-start',
-    maxWidth: '80%',
-    alignSelf: role === 'user' ? 'flex-end' : 'flex-start',
-  }),
-  avatar: {
-    fontSize: '20px',
-    flexShrink: 0,
-    marginTop: '4px',
-  },
-  avatarUser: {
-    fontSize: '20px',
-    flexShrink: 0,
-    marginTop: '4px',
-  },
-  bubble: (role) => ({
-    padding: `${space.sm}px ${space.md}px`,
-    borderRadius: role === 'user'
-      ? `${radius.xl}px ${radius.xl}px ${space.xs}px ${radius.xl}px`
-      : `${space.xs}px ${radius.xl}px ${radius.xl}px ${radius.xl}px`,
-    fontSize: fontSize.base,
-    lineHeight: 1.6,
-    maxWidth: '100%',
-    overflowWrap: 'break-word',
-    ...(role === 'user'
-      ? { backgroundColor: color.primary, color: '#fff' }
-      : { backgroundColor: color.gray1, color: color.textPrimary, border: `1px solid ${color.border}` }
-    ),
-  }),
-  inputArea: {
-    borderTop: `1px solid ${color.border}`,
-    paddingTop: space.md,
-    marginTop: space.sm,
-  },
-  // 弹窗
-  modalOverlay: {
-    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    display: 'flex', justifyContent: 'center', alignItems: 'center',
-    zIndex: 1000,
-  },
-  modal: {
-    backgroundColor: color.surface,
-    borderRadius: radius.xl,
-    padding: space.xl,
-    width: '90%',
-    maxWidth: '500px',
-    boxShadow: shadow.modal,
-  },
-  modalTitle: {
-    fontSize: fontSize.xl,
-    fontWeight: fontWeight.semibold,
-    color: color.textPrimary,
-    marginBottom: space.xs,
-  },
-  modalDesc: {
-    fontSize: fontSize.base,
-    color: color.textSecondary,
-    marginBottom: space.lg,
-  },
-  modalTextarea: {
-    width: '100%',
-    padding: space.sm,
-    border: `1px solid ${color.border}`,
-    borderRadius: radius.md,
-    fontSize: fontSize.base,
-    fontFamily: 'inherit',
-    resize: 'vertical',
-    boxSizing: 'border-box',
-    marginBottom: space.lg,
-  },
-  modalActions: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: space.sm,
-  },
-  btnCancel: {
-    backgroundColor: 'transparent',
-    border: `1px solid ${color.border}`,
-    borderRadius: radius.md,
-    padding: `${space.sm}px ${space.lg}px`,
-    cursor: 'pointer',
-    fontSize: fontSize.base,
-    color: color.textPrimary,
-  },
-  btnSubmit: {
-    backgroundColor: color.primary,
-    color: '#fff',
-    border: 'none',
-    borderRadius: radius.md,
-    padding: `${space.sm}px ${space.lg}px`,
-    cursor: 'pointer',
-    fontSize: fontSize.base,
-    fontWeight: fontWeight.medium,
-  },
-};

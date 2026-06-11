@@ -1,14 +1,15 @@
-import { fontSize, color, space, radius } from '../styles/tokens';
+import { fontSize, space, radius } from '../styles/tokens';
+import { useColors } from '../styles/tokens';
 
-const fontWeight = {
-  semibold: 600,
-};
+const fontWeight = { semibold: 600 };
 
 /**
  * 统一状态组件：loading / empty / error
  * variant: 'loading' | 'empty' | 'error'
  */
 export default function StatusMessage({ variant = 'loading', title, description }) {
+  const color = useColors();
+
   const config = {
     loading: {
       icon: '⏳',
@@ -32,6 +33,22 @@ export default function StatusMessage({ variant = 'loading', title, description 
 
   const c = config[variant] || config.loading;
 
+  const s = {
+    wrapper: (bg) => ({
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', padding: `${space.xxl}px`,
+      backgroundColor: bg, borderRadius: radius.lg,
+      border: `1px dashed ${color.border}`,
+      textAlign: 'center', margin: `${space.md}px 0`,
+    }),
+    icon: { fontSize: '36px', marginBottom: space.sm },
+    title: (col) => ({
+      fontSize: fontSize.lg, fontWeight: fontWeight.semibold,
+      color: col, marginBottom: space.xs,
+    }),
+    desc: { fontSize: fontSize.base, color: color.textSecondary, maxWidth: '360px', lineHeight: 1.6 },
+  };
+
   return (
     <div style={s.wrapper(c.bg)}>
       <div style={s.icon}>{c.icon}</div>
@@ -40,34 +57,3 @@ export default function StatusMessage({ variant = 'loading', title, description 
     </div>
   );
 }
-
-const s = {
-  wrapper: (bg) => ({
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: `${space.xxl}px`,
-    backgroundColor: bg,
-    borderRadius: radius.lg,
-    border: `1px dashed ${color.border}`,
-    textAlign: 'center',
-    margin: `${space.md}px 0`,
-  }),
-  icon: {
-    fontSize: '36px',
-    marginBottom: space.sm,
-  },
-  title: (c) => ({
-    fontSize: fontSize.lg,
-    fontWeight: fontWeight.semibold,
-    color: c,
-    marginBottom: space.xs,
-  }),
-  desc: {
-    fontSize: fontSize.base,
-    color: color.textSecondary,
-    maxWidth: '360px',
-    lineHeight: 1.6,
-  },
-};

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../utils/api';
-import { color, space, radius, fontSize, fontWeight, shadow } from '../styles/tokens';
+import { space, radius, fontSize, fontWeight, shadow, containerStyle, useColors } from '../styles/tokens';
+import { useIsSmall } from '../hooks/useMediaQuery';
 
 const CATEGORY_OPTIONS = [
   { value: 'web',          label: '🌐 Web 开发' },
@@ -17,265 +18,244 @@ const COLLAB_OPTIONS = [
   { value: 'research', label: '研究项目' },
 ];
 const EXP_OPTIONS = [
-  { value: 'any',         label: '不限' },
-  { value: 'beginner',  label: '初学者友好' },
+  { value: 'any',          label: '不限' },
+  { value: 'beginner',    label: '初学者友好' },
   { value: 'intermediate', label: '需要一定经验' },
-  { value: 'expert',      label: '需要专家级' },
+  { value: 'expert',       label: '需要专家级' },
 ];
 
 function Publish() {
-  const [name, setName]                 = useState('');
-  const [description, setDescription]     = useState('');
-  const [tags, setTags]                 = useState('');
-  const [price, setPrice]               = useState('');
-  const [contact, setContact]           = useState('');
-  const [category, setCategory]         = useState('other');
+  const [name, setName]                   = useState('');
+  const [description, setDescription]       = useState('');
+  const [tags, setTags]                   = useState('');
+  const [category, setCategory]           = useState('');
   const [requiredSkills, setRequiredSkills] = useState('');
-  const [collabType, setCollabType]     = useState('once');
-  const [expLevel, setExpLevel]         = useState('any');
-  const [timeCommit, setTimeCommit]     = useState('');
-  const [saving, setSaving]             = useState(false);
+  const [collabType, setCollabType]       = useState('');
+  const [expLevel, setExpLevel]           = useState('');
+  const [timeCommit, setTimeCommit]         = useState('');
+  const [contact, setContact]               = useState(() => localStorage.getItem('lastContact') || '');
+  const [loading, setLoading]               = useState(false);
+  const [error, setError]                 = useState('');
+  const [success, setSuccess]               = useState('');
+  const navigate                           = useNavigate();
+  const [searchParams]                     = useSearchParams();
+  const editId                             = searchParams.get('id');
+  const isSmall                            = useIsSmall();
+  const color = useColors();
 
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const editId = searchParams.get('id');
-
-  // 加载编辑数据 / 恢复 contact
   useEffect(() => {
-    if (editId) {
-      api.get(`/opc/detail/${editId}`)
-        .then(res => {
-          const d = res.data;
-          setName(d.name || '');
-          setDescription(d.description || '');
-          setTags(d.tags || '');
-          setPrice(d.price || '');
-          setContact(d.contact || '');
-          setCategory(d.category || 'other');
-          setRequiredSkills(Array.isArray(d.requiredSkills) ? d.requiredSkills.join(', ') : (d.requiredSkills || ''));
-          setCollabType(d.collaborationType || 'once');
-          setExpLevel(d.experienceLevel || 'any');
-          setTimeCommit(d.timeCommitment || '');
-        })
-        .catch(err => alert('加载失败：' + err.message));
-    } else {
-      const saved = localStorage.getItem('userContact');
-      if (saved) setContact(saved);
-    }
+    if (!editId) return;
+    api.get(`/opc/detail/${editId}`)
+      .then(res => {
+        const o = res.data;
+        setName(o.name);
+        setDescription(o.description || '');
+        setTags(o.tags || '');
+        setCategory(o.category || '');
+        setRequiredSkills((o.requiredSkills || []).join(', '));
+        setCollabType(o.collaborationType || '');
+        setExpLevel(o.experienceLevel || '');
+        setTimeCommit(o.timeCommitment || '');
+        setContact(o.contact || '');
+      })
+      .catch(() => { setError('加载失败'); });
   }, [editId]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!name.trim() || !contact.trim()) { alert('请填写名称与联系方式'); return; }
-    setSaving(true);
-    const payload = {
-      name: name.trim(),
-      description,
-      tags,
-      price,
-      contact: contact.trim(),
-      category,
-      requiredSkills: requiredSkills.split(/,\s*/).filter(Boolean),
-      collaborationType: collabType,
-      experienceLevel: expLevel,
-      timeCommitment: timeCommit,
-    };
-    const req = editId
-      ? api.put(`/opc/edit/${editId}`, payload)
-      : api.post('/opc/publish', payload);
-    req.then(() => {
-        localStorage.setItem('userContact', contact.trim());
-        alert(editId ? '编辑成功！' : '发布成功！');
-        navigate('/');
-      })
-      .catch(err => alert((editId ? '编辑' : '发布') + '失败：' + (err.response?.data?.error || err.message)))
-      .finally(() => setSaving(false));
+    setError(''); setSuccess('');
+    if (!name.trim()) { setError('请填写 OPC 名称'); return; }
+    if (!contact.trim()) { setError('请填写联系方式'); return; }
+
+    setLoading(true);
+    try {
+      const payload = {
+        name: name.trim(),
+        description: description.trim(),
+        tags: tags.trim(),
+        category,
+        requiredSkills: requiredSkills.split(/,\s*/).filter(Boolean),
+        collaborationType: collabType,
+        experienceLevel: expLevel,
+        timeCommitment: timeCommit,
+        contact: contact.trim(),
+      };
+      if (editId) {
+        await api.put(`/opc/edit/${editId}`, payload);
+        setSuccess('✅ 更新成功！');
+      } else {
+        await api.post('/opc/publish', payload);
+        setSuccess('✅ 发布成功！');
+      }
+      localStorage.setItem('lastContact', contact.trim());
+      setName(''); setDescription(''); setTags(''); setCategory('');
+      setRequiredSkills(''); setCollabType(''); setExpLevel(''); setTimeCommit('');
+      setTimeout(() => { setSuccess(''); navigate('/my-collaborations'); }, 1200);
+    } catch (err) {
+      setError(err.response?.data?.error || '发布失败');
+    }
+    setLoading(false);
+  };
+
+  // ------- 动态样式（依赖 color / isSmall）-------
+  const s = {
+    page: {
+      ...containerStyle,
+      paddingTop: space.xl, paddingBottom: space.page,
+      minHeight: 'calc(100vh - 56px)',
+    },
+    card: {
+      backgroundColor: color.surface,
+      border: `1px solid ${color.border}`,
+      borderRadius: radius.lg,
+      padding: isSmall ? space.lg : space.xl,
+      boxShadow: shadow.card,
+    },
+    title: {
+      fontSize: fontSize.xxl, fontWeight: fontWeight.semibold,
+      color: color.textPrimary, marginBottom: space.xs,
+    },
+    sub: { fontSize: fontSize.base, color: color.textSecondary, marginBottom: space.xl },
+    field: { marginBottom: space.lg },
+    label: {
+      display: 'block', fontSize: fontSize.sm, fontWeight: fontWeight.medium,
+      color: color.textPrimary, marginBottom: space.xs,
+    },
+    input: {
+      width: '100%', padding: `${space.xs}px ${space.sm}px`,
+      fontSize: fontSize.base, border: `1px solid ${color.border}`,
+      borderRadius: radius.md, outline: 'none', boxSizing: 'border-box',
+      backgroundColor: color.surface, color: color.textPrimary,
+      transition: 'border-color 0.15s',
+    },
+    textarea: {
+      width: '100%', padding: `${space.xs}px ${space.sm}px`,
+      fontSize: fontSize.base, border: `1px solid ${color.border}`,
+      borderRadius: radius.md, outline: 'none', boxSizing: 'border-box',
+      backgroundColor: color.surface, color: color.textPrimary,
+      minHeight: '80px', resize: 'vertical', fontFamily: 'inherit',
+      transition: 'border-color 0.15s',
+    },
+    select: {
+      width: '100%', padding: `${space.xs}px ${space.sm}px`,
+      fontSize: fontSize.base, border: `1px solid ${color.border}`,
+      borderRadius: radius.md, outline: 'none', backgroundColor: color.surface,
+      color: color.textPrimary, cursor: 'pointer', boxSizing: 'border-box',
+    },
+    row: {
+      display: 'grid',
+      gridTemplateColumns: isSmall ? '1fr' : '1fr 1fr',
+      gap: space.lg, marginBottom: space.lg,
+    },
+    error: {
+      padding: space.sm, marginBottom: space.lg,
+      backgroundColor: color.dangerLight, border: `1px solid ${color.danger}`,
+      borderRadius: radius.md, color: color.danger, fontSize: fontSize.sm,
+    },
+    success: {
+      padding: space.sm, marginBottom: space.lg,
+      backgroundColor: color.primaryLight, border: `1px solid ${color.primary}`,
+      borderRadius: radius.md, color: color.primaryDark, fontSize: fontSize.sm,
+    },
+    actions: {
+      display: 'flex', gap: space.md, marginTop: space.xl,
+      flexDirection: isSmall ? 'column' : 'row',
+    },
+    btnPrimary: {
+      backgroundColor: color.primary, color: '#fff',
+      padding: `${space.sm}px ${space.xl}px`, borderRadius: radius.md,
+      fontSize: fontSize.base, fontWeight: fontWeight.semibold,
+      border: 'none', cursor: 'pointer', transition: 'background-color 0.15s',
+    },
+    btnOutline: {
+      backgroundColor: 'transparent', color: color.textPrimary,
+      padding: `${space.sm}px ${space.xl}px`, borderRadius: radius.md,
+      fontSize: fontSize.base, fontWeight: fontWeight.medium,
+      border: `1px solid ${color.border}`, cursor: 'pointer',
+      transition: 'all 0.15s',
+    },
   };
 
   return (
     <div style={s.page}>
       <div style={s.card}>
-        <h1 style={s.title}>{editId ? '✏️ 编辑 OPC' : '🚀 发布新 OPC'}</h1>
-        <p style={s.subtitle}>{editId ? '修改你的协作项目信息' : '填写以下信息，开始招募协作者'}</p>
+        <h2 style={s.title}>{editId ? '✏️ 编辑 OPC' : '📝 发布新 OPC'}</h2>
+        <p style={s.sub}>
+          {editId ? '修改你的协作项目信息' : '描述你的协作需求，吸引合适的伙伴'}
+        </p>
 
-        <form onSubmit={handleSubmit} style={s.form}>
-          {/* 名称 */}
+        {error   && <div style={s.error}>{error}</div>}
+        {success && <div style={s.success}>{success}</div>}
+
+        <form onSubmit={handleSubmit}>
           <div style={s.field}>
-            <label style={s.label}>名称 <span style={{ color: color.danger }}>*</span></label>
-            <input
-              type="text" value={name} onChange={e => setName(e.target.value)}
-              style={s.input} placeholder="给你的 OPC 起个名字"
-              autoFocus={!editId}
-            />
+            <label style={s.label}>OPC 名称 <span style={{ color: color.danger }}>*</span></label>
+            <input style={s.input} value={name} onChange={e => setName(e.target.value)} placeholder="给协作项目起个名字" autoFocus={!editId} />
           </div>
 
-          {/* 描述 */}
           <div style={s.field}>
-            <label style={s.label}>描述</label>
-            <textarea
-              value={description} onChange={e => setDescription(e.target.value)}
-              style={{ ...s.input, minHeight: '100px', resize: 'vertical', fontFamily: 'inherit' }}
-              placeholder="详细描述你的项目目标、技术栈和协作方式..."
-            />
+            <label style={s.label}>项目描述</label>
+            <textarea style={s.textarea} value={description} onChange={e => setDescription(e.target.value)} placeholder="详细描述协作目标、技术栈、预期成果..." rows={4} />
           </div>
 
-          {/* 分类 + 协作类型 */}
+          <div style={s.field}>
+            <label style={s.label}>标签（逗号分隔）</label>
+            <input style={s.input} value={tags} onChange={e => setTags(e.target.value)} placeholder="例如：React, Node.js, LLM" />
+          </div>
+
           <div style={s.row}>
-            <div style={{ ...s.field, flex: 1 }}>
+            <div style={s.field}>
               <label style={s.label}>分类</label>
-              <select value={category} onChange={e => setCategory(e.target.value)} style={s.select}>
+              <select style={s.select} value={category} onChange={e => setCategory(e.target.value)}>
+                <option value="">请选择</option>
                 {CATEGORY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
-            <div style={{ ...s.field, flex: 1 }}>
+            <div style={s.field}>
               <label style={s.label}>协作类型</label>
-              <select value={collabType} onChange={e => setCollabType(e.target.value)} style={s.select}>
+              <select style={s.select} value={collabType} onChange={e => setCollabType(e.target.value)}>
+                <option value="">请选择</option>
                 {COLLAB_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
           </div>
 
-          {/* 经验要求 + 时间投入 */}
           <div style={s.row}>
-            <div style={{ ...s.field, flex: 1 }}>
+            <div style={s.field}>
               <label style={s.label}>经验要求</label>
-              <select value={expLevel} onChange={e => setExpLevel(e.target.value)} style={s.select}>
+              <select style={s.select} value={expLevel} onChange={e => setExpLevel(e.target.value)}>
+                <option value="">请选择</option>
                 {EXP_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </div>
-            <div style={{ ...s.field, flex: 1 }}>
+            <div style={s.field}>
               <label style={s.label}>时间投入</label>
-              <input
-                type="text" value={timeCommit} onChange={e => setTimeCommit(e.target.value)}
-                style={s.input} placeholder="如：每周 5 小时"
-              />
+              <input style={s.input} value={timeCommit} onChange={e => setTimeCommit(e.target.value)} placeholder="例如：每周 5 小时" />
             </div>
-          </div>
-
-          {/* 标签 + 技能 */}
-          <div style={s.field}>
-            <label style={s.label}>标签（逗号分隔）</label>
-            <input
-              type="text" value={tags} onChange={e => setTags(e.target.value)}
-              style={s.input} placeholder="如：React, 后端, DevOps"
-            />
           </div>
 
           <div style={s.field}>
             <label style={s.label}>所需技能（逗号分隔）</label>
-            <input
-              type="text" value={requiredSkills} onChange={e => setRequiredSkills(e.target.value)}
-              style={s.input} placeholder="如：TypeScript, Node.js, MongoDB"
-            />
+            <input style={s.input} value={requiredSkills} onChange={e => setRequiredSkills(e.target.value)} placeholder="例如：Python, PyTorch, 数据处理" />
           </div>
 
-          {/* 价格 + 联系方式 */}
-          <div style={s.row}>
-            <div style={{ ...s.field, flex: 1 }}>
-              <label style={s.label}>价格</label>
-              <input
-                type="text" value={price} onChange={e => setPrice(e.target.value)}
-                style={s.input} placeholder="如：¥5000、面议"
-              />
-            </div>
-            <div style={{ ...s.field, flex: 1 }}>
-              <label style={s.label}>联系方式 <span style={{ color: color.danger }}>*</span></label>
-              <input
-                type="text" value={contact} onChange={e => setContact(e.target.value)}
-                style={s.input} placeholder="微信 / 邮箱 / 电话"
-              />
-            </div>
+          <div style={s.field}>
+            <label style={s.label}>联系方式 <span style={{ color: color.danger }}>*</span></label>
+            <input style={s.input} value={contact} onChange={e => setContact(e.target.value)} placeholder="邮箱或手机号" />
           </div>
 
-          <button type="submit" style={s.btn} disabled={saving}>
-            {saving ? (editId ? '保存中...' : '发布中...') : (editId ? '💾 保存修改' : '🚀 发布 OPC')}
-          </button>
+          <div style={s.actions}>
+            <button type="submit" style={s.btnPrimary} disabled={loading}>
+              {loading ? '提交中...' : (editId ? '保存修改' : '发布项目')}
+            </button>
+            <button type="button" onClick={() => navigate(-1)} style={s.btnOutline}>
+              取消
+            </button>
+          </div>
         </form>
       </div>
     </div>
   );
 }
-
-// ------- 样式 -------
-const s = {
-  page: {
-    minHeight: 'calc(100vh - 56px)',
-    backgroundColor: color.bg,
-    padding: `${space.xl}px ${space.md}px`,
-    display: 'flex',
-    justifyContent: 'center',
-  },
-  card: {
-    backgroundColor: color.surface,
-    borderRadius: radius.xl,
-    boxShadow: shadow.card,
-    padding: `${space.xl}px ${space.xl}px`,
-    width: '100%',
-    maxWidth: '680px',
-  },
-  title: {
-    fontSize: fontSize.xxl,
-    fontWeight: fontWeight.semibold,
-    color: color.textPrimary,
-    marginBottom: space.xs,
-  },
-  subtitle: {
-    fontSize: fontSize.base,
-    color: color.textSecondary,
-    marginBottom: space.xl,
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: space.lg,
-  },
-  field: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: space.xs,
-  },
-  label: {
-    fontSize: fontSize.sm,
-    fontWeight: fontWeight.medium,
-    color: color.textPrimary,
-  },
-  input: {
-    padding: `${space.xs}px ${space.sm}px`,
-    fontSize: fontSize.base,
-    border: `1px solid ${color.border}`,
-    borderRadius: radius.md,
-    outline: 'none',
-    boxSizing: 'border-box',
-    width: '100%',
-    transition: 'border-color 0.15s',
-  },
-  select: {
-    padding: `${space.xs}px ${space.sm}px`,
-    fontSize: fontSize.base,
-    border: `1px solid ${color.border}`,
-    borderRadius: radius.md,
-    backgroundColor: color.surface,
-    cursor: 'pointer',
-    width: '100%',
-    outline: 'none',
-  },
-  row: {
-    display: 'flex',
-    gap: space.lg,
-  },
-  btn: {
-    width: '100%',
-    padding: `${space.sm}px ${space.lg}px`,
-    fontSize: fontSize.base,
-    fontWeight: fontWeight.semibold,
-    color: '#fff',
-    backgroundColor: color.primary,
-    border: 'none',
-    borderRadius: radius.md,
-    cursor: 'pointer',
-    marginTop: space.sm,
-    transition: 'background-color 0.15s',
-  },
-};
 
 export default Publish;

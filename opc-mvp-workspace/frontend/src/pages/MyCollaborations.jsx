@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import ToastContext from '../context/ToastContext';
 import { useContext } from 'react';
+import { useColors } from '../styles/tokens';
 
 export default function MyCollaborations() {
   const navigate = useNavigate();
   const { showToast } = useContext(ToastContext);
+  const color = useColors().colors;
   const [opcs, setOpcs] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -56,12 +58,62 @@ export default function MyCollaborations() {
     return <div style={s.loading}>加载中...</div>;
   }
 
+  // ---- 动态样式（依赖 color）----
+  const s = {
+    container: { maxWidth: 880, margin: '0 auto', padding: '40px 20px', minHeight: 'calc(100vh - 56px)', backgroundColor: color.bg },
+    header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32 },
+    title: { fontSize: 26, fontWeight: 700, margin: 0, color: color.textPrimary },
+    stats: { display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, fontSize: 13 },
+    statOnline: { color: color.primary, fontWeight: 600 },
+    statDivider: { color: color.border },
+    statOffline: { color: color.textSecondary },
+    btnPrimary: {
+      backgroundColor: color.primary, color: '#fff', padding: '10px 20px',
+      borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600,
+      whiteSpace: 'nowrap',
+    },
+    loading: { textAlign: 'center', padding: 60, color: color.textSecondary, fontSize: 15 },
+    empty: { textAlign: 'center', padding: 80, color: color.textSecondary },
+    emptyIcon: { fontSize: 48, marginBottom: 16 },
+    emptyTitle: { fontSize: 18, fontWeight: 600, color: color.textPrimary, marginBottom: 8 },
+    emptyDesc: { fontSize: 14, marginBottom: 24, color: color.textSecondary },
+    list: { display: 'flex', flexDirection: 'column', gap: 12 },
+    card: {
+      display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+      padding: 20, border: `1px solid ${color.border}`, borderRadius: 10, backgroundColor: color.surface,
+      transition: 'box-shadow 0.15s',
+    },
+    cardOffline: { backgroundColor: color.gray1, opacity: 0.7 },
+    cardLeft: { flex: 1, minWidth: 0 },
+    cardTopRow: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' },
+    cardTitle: { fontSize: 17, fontWeight: 600, margin: 0, color: color.textPrimary },
+    badgeOnline: {
+      fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 12,
+      backgroundColor: color.primaryLight, color: color.primary,
+    },
+    badgeOffline: {
+      fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 12,
+      backgroundColor: color.gray2, color: color.textSecondary,
+    },
+    cardDesc: { color: color.textSecondary, fontSize: 13, marginBottom: 10, lineHeight: 1.5 },
+    metaRow: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+    tag: { backgroundColor: color.infoLight, color: color.info, padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600 },
+    skillTag: { backgroundColor: color.gray1, color: color.textSecondary, padding: '3px 10px', borderRadius: 20, fontSize: 11, border: `1px solid ${color.border}` },
+    price: { color: color.textPrimary, fontSize: 13, fontWeight: 600 },
+    cardRight: { display: 'flex', flexDirection: 'column', gap: 6, marginLeft: 16, minWidth: 110 },
+    btnApplications: { backgroundColor: color.gray1, color: color.info, padding: '6px 12px', borderRadius: 6, border: `1px solid ${color.border}`, cursor: 'pointer', fontSize: 12, fontWeight: 500, textAlign: 'left' },
+    btnEdit: { backgroundColor: color.gray1, color: color.info, padding: '6px 12px', borderRadius: 6, border: `1px solid ${color.border}`, cursor: 'pointer', fontSize: 12, fontWeight: 500, textAlign: 'left' },
+    btnTakeDown: { backgroundColor: color.warningLight, color: color.warning, padding: '6px 12px', borderRadius: 6, border: `1px solid ${color.warning}`, cursor: 'pointer', fontSize: 12, fontWeight: 500, textAlign: 'left' },
+    btnPublish: { backgroundColor: color.primaryLight, color: color.primary, padding: '6px 12px', borderRadius: 6, border: `1px solid ${color.primary}`, cursor: 'pointer', fontSize: 12, fontWeight: 500, textAlign: 'left' },
+    btnDelete: { backgroundColor: color.dangerLight, color: color.danger, padding: '6px 12px', borderRadius: 6, border: `1px solid ${color.danger}`, cursor: 'pointer', fontSize: 12, fontWeight: 500, textAlign: 'left' },
+  };
+
   return (
     <div style={s.container}>
       {/* 顶部标题 + 统计 */}
       <div style={s.header}>
         <div>
-          <h1 style={s.title}>我的 OPC</h1>
+          <h1 style={s.title}>我的项目</h1>
           <div style={s.stats}>
             <span style={s.statOnline}>上架中 {onlineCount}</span>
             <span style={s.statDivider}>|</span>
@@ -69,7 +121,7 @@ export default function MyCollaborations() {
           </div>
         </div>
         <button onClick={() => navigate('/publish')} style={s.btnPrimary}>
-          + 发布新 OPC
+          + 发布新项目
         </button>
       </div>
 
@@ -77,15 +129,15 @@ export default function MyCollaborations() {
       {opcs.length === 0 && (
         <div style={s.empty}>
           <div style={s.emptyIcon}>📦</div>
-          <div style={s.emptyTitle}>还没有发布任何 OPC</div>
-          <div style={s.emptyDesc}>发布你的第一个 OPC，开始获得协作申请吧</div>
+          <div style={s.emptyTitle}>还没有发布任何项目</div>
+          <div style={s.emptyDesc}>发布你的第一个项目，开始获得协作申请吧</div>
           <button onClick={() => navigate('/publish')} style={s.btnPrimary}>
             去发布
           </button>
         </div>
       )}
 
-      {/* OPC 列表 */}
+      {/* 项目列表 */}
       <div style={s.list}>
         {opcs.map(opc => {
           const isOffline = opc.status === 'offline';
@@ -145,52 +197,3 @@ export default function MyCollaborations() {
     </div>
   );
 }
-
-const s = {
-  container: { maxWidth: 880, margin: '0 auto', padding: '40px 20px', minHeight: 'calc(100vh - 56px)' },
-  header: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 32 },
-  title: { fontSize: 26, fontWeight: 700, margin: 0, color: '#1f2328' },
-  stats: { display: 'flex', gap: 8, alignItems: 'center', marginTop: 6, fontSize: 13 },
-  statOnline: { color: '#1a7f37', fontWeight: 600 },
-  statDivider: { color: '#d0d7de' },
-  statOffline: { color: '#656d76' },
-  btnPrimary: {
-    backgroundColor: '#2ea44f', color: '#fff', padding: '10px 20px',
-    borderRadius: 8, border: 'none', cursor: 'pointer', fontSize: 14, fontWeight: 600,
-    whiteSpace: 'nowrap',
-  },
-  loading: { textAlign: 'center', padding: 60, color: '#656d76', fontSize: 15 },
-  empty: { textAlign: 'center', padding: 80, color: '#656d76' },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: 600, color: '#1f2328', marginBottom: 8 },
-  emptyDesc: { fontSize: 14, marginBottom: 24, color: '#656d76' },
-  list: { display: 'flex', flexDirection: 'column', gap: 12 },
-  card: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-    padding: 20, border: '1px solid #d0d7de', borderRadius: 10, backgroundColor: '#fff',
-    transition: 'box-shadow 0.15s',
-  },
-  cardOffline: { backgroundColor: '#f6f8fa', opacity: 0.7 },
-  cardLeft: { flex: 1, minWidth: 0 },
-  cardTopRow: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' },
-  cardTitle: { fontSize: 17, fontWeight: 600, margin: 0, color: '#1f2328' },
-  badgeOnline: {
-    fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 12,
-    backgroundColor: '#dafbe4', color: '#1a7f37',
-  },
-  badgeOffline: {
-    fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 12,
-    backgroundColor: '#eaeef2', color: '#656d76',
-  },
-  cardDesc: { color: '#656d76', fontSize: 13, marginBottom: 10, lineHeight: 1.5 },
-  metaRow: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  tag: { backgroundColor: '#ddf4ff', color: '#0969da', padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 600 },
-  skillTag: { backgroundColor: '#f6f8fa', color: '#656d76', padding: '3px 10px', borderRadius: 20, fontSize: 11, border: '1px solid #d0d7de' },
-  price: { color: '#1f2328', fontSize: 13, fontWeight: 600 },
-  cardRight: { display: 'flex', flexDirection: 'column', gap: 6, marginLeft: 16, minWidth: 110 },
-  btnApplications: { backgroundColor: '#f6f8fa', color: '#0969da', padding: '6px 12px', borderRadius: 6, border: '1px solid #d0d7de', cursor: 'pointer', fontSize: 12, fontWeight: 500, textAlign: 'left' },
-  btnEdit: { backgroundColor: '#f6f8fa', color: '#0969da', padding: '6px 12px', borderRadius: 6, border: '1px solid #d0d7de', cursor: 'pointer', fontSize: 12, fontWeight: 500, textAlign: 'left' },
-  btnTakeDown: { backgroundColor: '#fff8f0', color: '#bc4c00', padding: '6px 12px', borderRadius: 6, border: '1px solid #ffc071', cursor: 'pointer', fontSize: 12, fontWeight: 500, textAlign: 'left' },
-  btnPublish: { backgroundColor: '#dafbe4', color: '#1a7f37', padding: '6px 12px', borderRadius: 6, border: '1px solid #2da44e', cursor: 'pointer', fontSize: 12, fontWeight: 500, textAlign: 'left' },
-  btnDelete: { backgroundColor: '#ffebe9', color: '#cf222e', padding: '6px 12px', borderRadius: 6, border: '1px solid #ffc1ba', cursor: 'pointer', fontSize: 12, fontWeight: 500, textAlign: 'left' },
-};

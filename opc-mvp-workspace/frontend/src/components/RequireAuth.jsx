@@ -1,5 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useColors } from '../styles/tokens';
 
 /**
  * 路由守卫组件
@@ -7,10 +8,11 @@ import { useState, useEffect } from 'react';
  */
 function RequireAuth({ children }) {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
+  const color = useColors().colors;
   const location = useLocation();
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = localStorage.getItem('accessToken');
     if (!token) {
       setIsAuthenticated(false);
       return;
@@ -29,7 +31,8 @@ function RequireAuth({ children }) {
         if (res.ok) {
           setIsAuthenticated(true);
         } else {
-          localStorage.removeItem('token');
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
           localStorage.removeItem('user');
           setIsAuthenticated(false);
         }
@@ -37,7 +40,8 @@ function RequireAuth({ children }) {
       .catch(() => {
         clearTimeout(timeout);
         // 网络错误时也允许访问，避免一直卡在验证中
-        localStorage.removeItem('token');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
         localStorage.removeItem('user');
         setIsAuthenticated(false);
       });
@@ -47,7 +51,7 @@ function RequireAuth({ children }) {
 
   if (isAuthenticated === null) {
     // 正在验证中，显示加载
-    return <div style={styles.loading}>验证中...</div>;
+    return <div style={{ display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', fontSize:'18px', color: color.textSecondary }}>验证中...</div>;
   }
 
   if (!isAuthenticated) {
@@ -57,16 +61,4 @@ function RequireAuth({ children }) {
 
   return children;
 }
-
-const styles = {
-  loading: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100vh',
-    fontSize: '18px',
-    color: '#586069',
-  },
-};
-
 export default RequireAuth;
