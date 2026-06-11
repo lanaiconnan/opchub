@@ -8,6 +8,7 @@ import MyApplications from './pages/MyApplications';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import NotificationPage from './pages/NotificationPage';
+import Stats from './pages/Stats';
 import RequireAuth from './components/RequireAuth';
 
 function App() {
@@ -23,6 +24,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/notifications" element={<RequireAuth><NotificationPage /></RequireAuth>} />
+        <Route path="/stats" element={<Stats />} />
       </Routes>
     </Router>
   );

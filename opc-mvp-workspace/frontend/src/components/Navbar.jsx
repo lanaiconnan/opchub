@@ -143,6 +143,9 @@ export default function Navbar() {
             </button>
           ) : (
             <div style={s.desktopLinks}>
+              <Link to="/stats" style={s.link} onClick={() => setMenuOpen(false)}>
+                📊 统计
+              </Link>
               {/* 主题切换 */}
               <button onClick={toggle} style={s.themeBtn} title={isDark ? '切换到亮色' : '切换到暗色'}>
                 {isDark ? '☀️' : '🌙'}
@@ -179,6 +182,9 @@ export default function Navbar() {
             {isDark ? '☀️ 亮色模式' : '🌙 暗色模式'}
           </button>
 
+          <Link to="/stats" style={s.mobileLink} onClick={() => setMenuOpen(false)}>
+            📊 统计
+          </Link>
           {isLoggedIn && (
             <>
               <Link to="/my-applications" style={s.mobileLink} onClick={() => setMenuOpen(false)}>

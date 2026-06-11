@@ -795,6 +795,62 @@ app.get('/opc/match/:id', async (req, res) => {
   res.json(scored.slice(0, 5));
 });
 
+// ==================== 分类统计 ====================
+
+// GET /opc/stats — 全局 + 个人统计
+app.get('/opc/stats', async (req, res) => {
+  await db.read();
+  const list = db.data.opcList || [];
+
+  const countBy = (items, key, defaultValue) => {
+    const map = {};
+    for (const item of items) {
+      const val = item[key] || defaultValue;
+      if (val === '' || val === null || val === undefined) continue;
+      if (Array.isArray(val)) {
+        for (const v of val) {
+          if (v && v.trim()) map[v.trim()] = (map[v.trim()] || 0) + 1;
+        }
+      } else {
+        map[val] = (map[val] || 0) + 1;
+      }
+    }
+    return map;
+  };
+
+  const global = {
+    total: list.length,
+    byCategory: countBy(list, 'category', 'other'),
+    bySkill: countBy(list, 'requiredSkills', []),
+    byCollaborationType: countBy(list, 'collaborationType', 'once'),
+    byExperienceLevel: countBy(list, 'experienceLevel', 'any'),
+    byTimeCommitment: countBy(list, 'timeCommitment', ''),
+  };
+
+  let personal = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.verify(token, JWT_SECRET);
+      const userId = decoded.userId;
+      const myList = list.filter(opc => opc.authorId === userId);
+      const allApps = db.data.applications || [];
+      personal = {
+        total: myList.length,
+        byCategory: countBy(myList, 'category', 'other'),
+        bySkill: countBy(myList, 'requiredSkills', []),
+        byCollaborationType: countBy(myList, 'collaborationType', 'once'),
+        byExperienceLevel: countBy(myList, 'experienceLevel', 'any'),
+        applicationsSent: allApps.filter(a => a.applicantId === userId).length,
+        applicationsReceived: allApps.filter(a => myList.some(o => o.id === a.opcId)).length,
+      };
+    } catch (_) { /* token invalid -> no personal stats */ }
+  }
+
+  res.json({ global, personal });
+});
+
 // ==================== Start Server ====================
 
 app.listen(PORT, () => {
