@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import StatusMessage from '../components/StatusMessage';
 import api from '../utils/api';
 import { space, fontSize, fontWeight, shadow, containerStyle, useColors } from '../styles/tokens';
@@ -287,7 +287,8 @@ export default function Home() {
 
   const [opcList, setOpcList] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get('q') || '');
   const [activeTab, setActiveTab] = useState('');
   const [starData, setStarData] = useState({});
   const [showApplyModal, setShowApplyModal] = useState(false);
