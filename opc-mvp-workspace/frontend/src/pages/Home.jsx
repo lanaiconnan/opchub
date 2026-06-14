@@ -450,7 +450,7 @@ export default function Home() {
               isDark={isDark}
               onStar={toggleStar}
               onApply={() => { setSelectedOpc(opc); setShowApplyModal(true); }}
-              onChat={() => navigate(`/chat/${opc.id}`)}
+              onChat={() => navigate(`/opc/${opc.id}`)}
             />
           ))}
         </div>
