@@ -104,11 +104,14 @@ function ApplyModal({ opc, onClose, onSubmit, loading }) {
 }
 
 // -------- 仓库列表式卡片 --------
-function RepoCard({ opc, starData, onStar, onApply, onChat, isDark }) {
+function RepoCard({ opc, starData, applicantCounts, onStar, onApply, onChat, isDark }) {
   const c = useColors();
   const catColors = CATEGORY_COLORS[opc.category] || CATEGORY_COLORS.other;
   const catBg = isDark ? catColors.darkBg : catColors.bg;
   const catText = isDark ? catColors.darkText : catColors.text;
+  const starred = starData[opc.id]?.starred;
+  const starCount = starData[opc.id]?.count || 0;
+  const appCount = applicantCounts[opc.id] || 0;
 
   const collabMap = { once: '一次性', longterm: '长期', research: '研究', '长期': '长期' };
   const expMap = { beginner: '🌱 初学者', intermediate: '💡 有经验', expert: '🏆 专家', any: '不限', '中级': '💡 有经验' };
@@ -118,17 +121,19 @@ function RepoCard({ opc, starData, onStar, onApply, onChat, isDark }) {
       padding: `${space.lg} ${space.xl}`,
       borderBottom: `1px solid ${c.border}`,
       borderLeft: '3px solid transparent',
-      transition: 'border-left-color 0.15s, background-color 0.15s',
+      transition: 'all 0.2s ease',
       cursor: 'pointer',
     }}
     onClick={onChat}
     onMouseEnter={e => {
       e.currentTarget.style.borderLeftColor = c.primary;
       e.currentTarget.style.backgroundColor = isDark ? '#161b22' : '#f6f8fa';
+      e.currentTarget.style.boxShadow = isDark ? '0 1px 4px rgba(0,0,0,0.3)' : '0 1px 4px rgba(0,0,0,0.06)';
     }}
     onMouseLeave={e => {
       e.currentTarget.style.borderLeftColor = 'transparent';
       e.currentTarget.style.backgroundColor = 'transparent';
+      e.currentTarget.style.boxShadow = 'none';
     }}
     >
       {/* 标题行 */}
@@ -136,7 +141,6 @@ function RepoCard({ opc, starData, onStar, onApply, onChat, isDark }) {
         <h3 style={{
           fontSize: fontSize.lg, fontWeight: fontWeight.semibold,
           color: c.primary, margin: 0, cursor: 'pointer',
-          '&:hover': { textDecoration: 'underline' },
         }}>{opc.name}</h3>
         <span style={{
           padding: `1px ${space.sm}px`, borderRadius: '9999px',
@@ -151,6 +155,12 @@ function RepoCard({ opc, starData, onStar, onApply, onChat, isDark }) {
             backgroundColor: isDark ? '#2a2013' : '#fff8f0', color: isDark ? '#d29922' : '#bc4c00',
             border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
           }}>{collabMap[opc.collaborationType] || opc.collaborationType}</span>
+        )}
+        {opc.experienceLevel && opc.experienceLevel !== 'any' && (
+          <span style={{ fontSize: fontSize.xs, color: c.textMuted }}>{expMap[opc.experienceLevel] || opc.experienceLevel}</span>
+        )}
+        {opc.timeCommitment && (
+          <span style={{ fontSize: fontSize.xs, color: c.textMuted }}>⏱ {opc.timeCommitment}</span>
         )}
       </div>
 
@@ -175,25 +185,46 @@ function RepoCard({ opc, starData, onStar, onApply, onChat, isDark }) {
         {(opc.requiredSkills?.length || 0) > 4 && (
           <span style={{ fontSize: fontSize.xs, color: c.textMuted }}>+{(opc.requiredSkills?.length || 0) - 4}</span>
         )}
-        {opc.experienceLevel && opc.experienceLevel !== 'any' && (
-          <span style={{ fontSize: fontSize.sm, color: c.textMuted }}>{expMap[opc.experienceLevel] || opc.experienceLevel}</span>
-        )}
-        {opc.timeCommitment && (
-          <span style={{ fontSize: fontSize.sm, color: c.textMuted }}>⏱ {opc.timeCommitment}</span>
-        )}
-        <span style={{ fontSize: fontSize.sm, color: c.textMuted }}>
-          {starData[opc.id]?.starred ? '⭐' : '☆'} {starData[opc.id]?.count || 0}
+
+        {/* 分隔符 */}
+        <span style={{ color: c.border, fontSize: fontSize.md }}>·</span>
+
+        {/* Star */}
+        <span style={{
+          fontSize: fontSize.sm,
+          color: starred ? '#d29922' : c.textMuted,
+          fontWeight: starred ? fontWeight.medium : fontWeight.normal,
+        }}>
+          {starred ? '⭐' : '☆'} {starCount}
         </span>
-        {opc.createdAt && (
-          <span style={{ fontSize: fontSize.sm, color: c.textMuted }}>更新于 {timeAgo(opc.createdAt)}</span>
+
+        {/* 申请人数 */}
+        {appCount > 0 && (
+          <span style={{ fontSize: fontSize.sm, color: c.textMuted }}>
+            📩 {appCount} 人申请
+          </span>
         )}
+
+        {/* 更新时间 */}
+        {opc.createdAt && (
+          <span style={{ fontSize: fontSize.sm, color: c.textMuted }}>
+            更新于 {timeAgo(opc.createdAt)}
+          </span>
+        )}
+
+        {/* 右侧按钮 */}
         <div style={{ marginLeft: 'auto', display: 'flex', gap: space.sm }}>
           <button onClick={e => { e.stopPropagation(); onStar(opc.id, e); }} style={{
-            background: 'none', border: `1px solid ${c.border}`, borderRadius: '6px',
+            background: starred ? 'rgba(210,153,34,0.1)' : 'none',
+            border: `1px solid ${starred ? '#d29922' : c.border}`,
+            borderRadius: '6px',
             padding: `${space.xs}px ${space.sm}px`, fontSize: fontSize.sm,
-            cursor: 'pointer', color: c.textSecondary, transition: 'border-color 0.15s',
+            cursor: 'pointer',
+            color: starred ? '#d29922' : c.textSecondary,
+            fontWeight: starred ? fontWeight.medium : fontWeight.normal,
+            transition: 'all 0.15s',
           }}>
-            {starData[opc.id]?.starred ? '★ Starred' : '☆ Star'}
+            {starred ? '★ Starred' : '☆ Star'}
           </button>
           <button onClick={e => { e.stopPropagation(); onApply(); }} style={{
             background: c.primary, color: '#fff', border: 'none', borderRadius: '6px',
@@ -206,23 +237,44 @@ function RepoCard({ opc, starData, onStar, onApply, onChat, isDark }) {
   );
 }
 
+// -------- Skeleton 骨架屏 --------
+function SkeletonCard() {
+  const c = useColors();
+  const base = {
+    height: '14px', borderRadius: '4px',
+    backgroundColor: isDark => isDark ? '#21262d' : '#e5e7eb',
+    animation: 'pulse 1.5s ease-in-out infinite',
+  };
+  const isDark = c.bg === '#0d1117';
+  return (
+    <div style={{
+      padding: `${space.lg}px ${space.xl}px`,
+      borderBottom: `1px solid ${c.border}`,
+    }}>
+      <div style={{ display: 'flex', gap: space.sm, marginBottom: space.sm }}>
+        <div style={{ ...base, width: '140px', backgroundColor: isDark ? '#21262d' : '#e5e7eb' }} />
+        <div style={{ ...base, width: '48px', backgroundColor: isDark ? '#21262d' : '#e5e7eb' }} />
+      </div>
+      <div style={{ ...base, width: '80%', marginBottom: space.sm, backgroundColor: isDark ? '#21262d' : '#e5e7eb' }} />
+      <div style={{ ...base, width: '60%', backgroundColor: isDark ? '#21262d' : '#e5e7eb' }} />
+    </div>
+  );
+}
+
 // -------- Sidebar --------
 function Sidebar({ stats, opcList, navigate, isDark }) {
   const c = useColors();
 
-  // 热门标签
   const topSkills = useMemo(() => {
     const map = {};
     (opcList || []).forEach(opc => (opc.requiredSkills || []).forEach(s => { map[s] = (map[s] || 0) + 1; }));
     return Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 10);
   }, [opcList]);
 
-  // 分类统计
   const categories = stats?.byCategory || {};
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: space.lg }}>
-      {/* 统计摘要 */}
       <div style={{
         backgroundColor: c.surface, border: `1px solid ${c.border}`,
         borderRadius: '8px', padding: space.lg,
@@ -252,7 +304,6 @@ function Sidebar({ stats, opcList, navigate, isDark }) {
         }}>查看详细统计 →</a>
       </div>
 
-      {/* 热门标签 */}
       {topSkills.length > 0 && (
         <div style={{
           backgroundColor: c.surface, border: `1px solid ${c.border}`,
@@ -291,27 +342,60 @@ export default function Home() {
   const [search, setSearch] = useState(searchParams.get('q') || '');
   const [activeTab, setActiveTab] = useState('');
   const [starData, setStarData] = useState({});
+  const [applicantCounts, setApplicantCounts] = useState({});
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedOpc, setSelectedOpc] = useState(null);
   const [applyLoading, setApplyLoading] = useState(false);
   const [stats, setStats] = useState(null);
+  const searchRef = useRef(null);
 
   // 加载数据
   useEffect(() => {
     api.get('/opc/list').then(res => {
       setOpcList(res.data);
       setLoading(false);
-      if (res.data.length > 0) fetchStarData(res.data.map(o => o.id));
+      const ids = res.data.map(o => o.id);
+      if (ids.length > 0) {
+        fetchStarData(ids);
+        fetchApplicantCounts(ids);
+      }
     }).catch(() => setLoading(false));
 
-    // 加载统计（无需 token 也有全局统计）
     fetch('/opc/stats').then(r => r.json()).then(setStats).catch(() => {});
   }, []);
+
+  // `/` 快捷键聚焦搜索框
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === '/' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const tag = e.target.tagName;
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && !e.target.isContentEditable) {
+          e.preventDefault();
+          searchRef.current?.focus();
+        }
+      }
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
+
+  // 从 URL 参数同步搜索词
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q && q !== search) setSearch(q);
+  }, [searchParams]);
 
   const fetchStarData = async (ids) => {
     try {
       const res = await api.get(`/opc/star/batch?ids=${ids.join(',')}`);
       setStarData(res.data);
+    } catch { /* ignore */ }
+  };
+
+  const fetchApplicantCounts = async (ids) => {
+    try {
+      const res = await fetch(`/opc/applicant-counts?ids=${ids.join(',')}`).then(r => r.json());
+      setApplicantCounts(res);
     } catch { /* ignore */ }
   };
 
@@ -332,6 +416,8 @@ export default function Home() {
     try {
       await api.post(`/opc/apply/${selectedOpc.id}`, form);
       setShowApplyModal(false);
+      // 刷新申请人数
+      fetchApplicantCounts(opcList.map(o => o.id));
     } catch { /* ignore */ }
     setApplyLoading(false);
   };
@@ -348,15 +434,6 @@ export default function Home() {
     });
   }, [opcList, search, activeTab]);
 
-  // ---- 样式 ----
-  const searchInput = {
-    flex: 1, padding: `${space.sm}px ${space.md}px`,
-    fontSize: fontSize.base, border: `1px solid ${color.border}`,
-    borderRadius: '8px', outline: 'none', boxSizing: 'border-box',
-    backgroundColor: color.surface, color: color.textPrimary, fontFamily: 'inherit',
-    minWidth: 0,
-  };
-
   return (
     <div style={{ ...containerStyle, paddingTop: space.xl, paddingBottom: space.huge, minHeight: 'calc(100vh - 60px)' }}>
 
@@ -364,18 +441,53 @@ export default function Home() {
       <div style={{
         display: 'flex', gap: space.sm, marginBottom: space.lg,
         flexDirection: isMobile ? 'column' : 'row',
+        alignItems: isMobile ? 'stretch' : 'center',
       }}>
-        <input
-          style={searchInput}
-          type="text"
-          placeholder="搜索项目名称、描述、技能..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
+        <div style={{ flex: 1, position: 'relative' }}>
+          <input
+            ref={searchRef}
+            style={{
+              width: '100%',
+              padding: `${space.md}px ${space.lg}px ${space.md}px 40px`,
+              fontSize: fontSize.lg,
+              border: `1px solid ${color.border}`,
+              borderRadius: '10px',
+              outline: 'none', boxSizing: 'border-box',
+              backgroundColor: color.surface, color: color.textPrimary,
+              fontFamily: 'inherit',
+              transition: 'border-color 0.15s, box-shadow 0.15s',
+            }}
+            type="text"
+            placeholder="搜索项目名称、描述、技能..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            onFocus={e => {
+              e.target.style.borderColor = color.primary;
+              e.target.style.boxShadow = `0 0 0 3px ${isDark ? 'rgba(88,166,255,0.2)' : 'rgba(9,105,218,0.15)'}`;
+            }}
+            onBlur={e => {
+              e.target.style.borderColor = color.border;
+              e.target.style.boxShadow = 'none';
+            }}
+          />
+          <span style={{
+            position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)',
+            color: color.textMuted, fontSize: fontSize.md, pointerEvents: 'none',
+          }}>🔍</span>
+          <kbd style={{
+            position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)',
+            padding: '2px 6px', borderRadius: '4px',
+            fontSize: fontSize.xs, fontWeight: fontWeight.medium,
+            backgroundColor: isDark ? '#21262d' : '#f6f8fa',
+            color: color.textMuted,
+            border: `1px solid ${color.border}`,
+            pointerEvents: 'none', fontFamily: 'inherit',
+          }}>/</kbd>
+        </div>
         {isLoggedIn() && (
           <button onClick={() => navigate('/publish')} style={{
             backgroundColor: color.primary, color: '#fff', border: 'none',
-            borderRadius: '8px', padding: `${space.sm}px ${space.lg}px`,
+            borderRadius: '10px', padding: `${space.md}px ${space.lg}px`,
             fontSize: fontSize.base, fontWeight: fontWeight.semibold,
             cursor: 'pointer', whiteSpace: 'nowrap',
           }}>＋ 发布项目</button>
@@ -385,9 +497,7 @@ export default function Home() {
       {/* 分类 Tab */}
       <div style={{
         display: 'flex', gap: 0, borderBottom: `1px solid ${color.border}`,
-        marginBottom: 0, overflowX: 'auto',
-        WebkitOverflowScrolling: 'touch',
-        '&::-webkit-scrollbar': { display: 'none' },
+        marginBottom: 0, overflowX: 'auto', WebkitOverflowScrolling: 'touch',
       }}>
         {TABS.map(tab => (
           <button
@@ -397,7 +507,8 @@ export default function Home() {
               padding: `${space.sm}px ${space.md}px`,
               fontSize: fontSize.base, fontWeight: activeTab === tab.key ? fontWeight.semibold : fontWeight.normal,
               color: activeTab === tab.key ? color.primary : color.textSecondary,
-              backgroundColor: 'transparent', border: 'none', borderBottom: activeTab === tab.key ? `2px solid ${color.primary}` : '2px solid transparent',
+              backgroundColor: 'transparent', border: 'none',
+              borderBottom: activeTab === tab.key ? `2px solid ${color.primary}` : '2px solid transparent',
               cursor: 'pointer', whiteSpace: 'nowrap', transition: 'color 0.15s, border-color 0.15s',
             }}
           >
@@ -411,7 +522,6 @@ export default function Home() {
         display: 'flex', gap: space.xl,
         flexDirection: isMobile ? 'column' : 'row',
       }}>
-        {/* 左：列表 */}
         <div style={{ flex: 1, minWidth: 0 }}>
           {/* 列表头 */}
           <div style={{
@@ -432,7 +542,12 @@ export default function Home() {
             )}
           </div>
 
-          {loading && <StatusMessage variant="loading" />}
+          {/* 骨架屏 / 空状态 / 列表 */}
+          {loading && (
+            <div>
+              {[1,2,3].map(i => <SkeletonCard key={i} />)}
+            </div>
+          )}
 
           {!loading && filteredList.length === 0 && (
             <StatusMessage
@@ -447,6 +562,7 @@ export default function Home() {
               key={opc.id}
               opc={opc}
               starData={starData}
+              applicantCounts={applicantCounts}
               isDark={isDark}
               onStar={toggleStar}
               onApply={() => { setSelectedOpc(opc); setShowApplyModal(true); }}
@@ -455,7 +571,6 @@ export default function Home() {
           ))}
         </div>
 
-        {/* 右：Sidebar */}
         {!isMobile && (
           <div style={{ width: '280px', flexShrink: 0, position: 'sticky', top: '72px', alignSelf: 'flex-start' }}>
             <Sidebar stats={stats?.global} opcList={opcList} navigate={navigate} isDark={isDark} />
@@ -463,10 +578,8 @@ export default function Home() {
         )}
       </div>
 
-      {/* 移动端 sidebar 移到列表下方 */}
       {isMobile && <Sidebar stats={stats?.global} opcList={opcList} navigate={navigate} isDark={isDark} />}
 
-      {/* 申请弹窗 */}
       {showApplyModal && selectedOpc && (
         <ApplyModal
           opc={selectedOpc}

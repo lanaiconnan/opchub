@@ -621,6 +621,44 @@ app.get('/opc/star/:id', async (req, res) => {
   res.json({ count, starred });
 });
 
+// GET /opc/star/batch — 批量获取多个 OPC 的 star 信息
+app.get('/opc/star/batch', async (req, res) => {
+  await db.read();
+  db.data.stars = db.data.stars || [];
+  const ids = (req.query.ids || '').split(',').map(Number).filter(Boolean);
+  const userId = getUserId(req);
+  const result = {};
+  ids.forEach(opcId => {
+    const starRecord = db.data.stars.find(s => s.opcId === opcId);
+    result[opcId] = {
+      count: starRecord ? starRecord.count : 0,
+      starred: starRecord ? (starRecord.starredBy || []).includes(userId) : false,
+    };
+  });
+  res.json(result);
+});
+
+// GET /opc/applicant-count/:id — 获取某个 OPC 的申请人数
+app.get('/opc/applicant-count/:id', async (req, res) => {
+  await db.read();
+  db.data.applications = db.data.applications || [];
+  const opcId = Number(req.params.id);
+  const count = db.data.applications.filter(a => a.opcId === opcId).length;
+  res.json({ count });
+});
+
+// GET /opc/applicant-counts — 批量获取多个 OPC 的申请人数
+app.get('/opc/applicant-counts', async (req, res) => {
+  await db.read();
+  db.data.applications = db.data.applications || [];
+  const ids = (req.query.ids || '').split(',').map(Number).filter(Boolean);
+  const result = {};
+  ids.forEach(opcId => {
+    result[opcId] = db.data.applications.filter(a => a.opcId === opcId).length;
+  });
+  res.json(result);
+});
+
 // ==================== My Applications ====================
 
 // GET /opc/my-opcs — 获取我发布的 OPC（需登录）

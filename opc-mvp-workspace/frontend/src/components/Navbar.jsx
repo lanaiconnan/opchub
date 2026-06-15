@@ -82,7 +82,7 @@ export default function Navbar() {
 
         {/* 中间搜索框（仅桌面端） */}
         {!isMobile && (
-          <form onSubmit={handleSearch} style={{ flex: 1, maxWidth: '420px', position: 'relative' }}>
+          <form onSubmit={handleSearch} style={{ flex: 1, maxWidth: '600px', position: 'relative' }}>
             <input
               type="text"
               value={searchQuery}
@@ -90,7 +90,7 @@ export default function Navbar() {
               placeholder="搜索项目..."
               style={{
                 width: '100%', padding: `${space.sm}px ${space.md}px ${space.sm}px 36px`,
-                fontSize: fontSize.base, border: '1px solid rgba(255,255,255,0.2)',
+                fontSize: fontSize.lg, border: '1px solid rgba(255,255,255,0.2)',
                 borderRadius: '8px', outline: 'none', boxSizing: 'border-box',
                 backgroundColor: 'rgba(255,255,255,0.08)', color: '#fff',
                 fontFamily: 'inherit', transition: 'background-color 0.15s, border-color 0.15s',
